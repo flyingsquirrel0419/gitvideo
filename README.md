@@ -20,6 +20,15 @@ npm run build
 
 The installer downloads the latest GitHub release source archive, runs `npm install`, builds the CLI, and finishes with `npm link` so `gitvideo` is available on your shell.
 
+macOS prerequisites:
+
+```bash
+brew install node@22 ffmpeg gh pkg-config cairo pango libpng jpeg giflib librsvg pixman
+```
+
+If your shell is still using Node 24, switch to Node 22 LTS before installing.
+Do not run the installer with `sudo`.
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/flyingsquirrel0419/gitvideo/main/scripts/install.sh | bash -s -- flyingsquirrel0419/gitvideo
 ```

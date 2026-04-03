@@ -37,6 +37,23 @@ NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
 if [[ "$NODE_MAJOR" -lt 18 ]]; then
   fail "Node.js 18 or newer is required."
 fi
+if [[ "$NODE_MAJOR" -ge 24 ]]; then
+  fail "Node.js 24 is not supported yet because canvas does not ship a compatible prebuilt binary here. Use Node 20 or 22 LTS."
+fi
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  if ! command -v brew >/dev/null 2>&1; then
+    fail "Homebrew is required on macOS. Install brew first, then run: brew install pkg-config cairo pango libpng jpeg giflib librsvg pixman ffmpeg gh"
+  fi
+
+  if ! command -v pkg-config >/dev/null 2>&1; then
+    fail "pkg-config is missing. Run: brew install pkg-config cairo pango libpng jpeg giflib librsvg pixman"
+  fi
+
+  if ! pkg-config --exists pixman-1 cairo pangocairo librsvg-2.0; then
+    fail "canvas build dependencies are missing. Run: brew install cairo pango libpng jpeg giflib librsvg pixman"
+  fi
+fi
 
 resolve_latest_tag() {
   local api_url

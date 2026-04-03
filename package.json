@@ -3,6 +3,14 @@
   "version": "1.0.0",
   "description": "Git commit history to video generator",
   "main": "dist/index.js",
+  "homepage": "https://github.com/flyingsquirrel0419/gitvideo#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/flyingsquirrel0419/gitvideo.git"
+  },
+  "bugs": {
+    "url": "https://github.com/flyingsquirrel0419/gitvideo/issues"
+  },
   "bin": {
     "gitvideo": "dist/index.js"
   },

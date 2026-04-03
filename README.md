@@ -21,7 +21,7 @@ npm run build
 The installer downloads the latest GitHub release source archive, runs `npm install`, builds the CLI, and finishes with `npm link` so `gitvideo` is available on your shell.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/scripts/install.sh | bash -s -- OWNER/REPO
+curl -fsSL https://raw.githubusercontent.com/flyingsquirrel0419/gitvideo/main/scripts/install.sh | bash -s -- flyingsquirrel0419/gitvideo
 ```
 
 If your npm global prefix is not writable, the installer automatically falls back to `~/.local` and tells you which `PATH` entry to add.

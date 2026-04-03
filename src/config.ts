@@ -20,6 +20,7 @@ export interface CliGenerateOptions {
   github?: string;
   token?: string;
   output?: string;
+  outputDir?: string;
   fps?: string;
   speed?: string;
   width?: string;
@@ -43,6 +44,45 @@ export interface AppConfig {
   excludeBranches: string[];
   render: RenderConfig;
   themeName: 'dark' | 'light';
+}
+
+function sanitizeFileSegment(value: string): string {
+  return value
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase();
+}
+
+function detectCurrentBranch(repoPath: string): string | undefined {
+  try {
+    const headPath = path.join(repoPath, '.git', 'HEAD');
+    if (!fs.existsSync(headPath)) {
+      return undefined;
+    }
+
+    const head = fs.readFileSync(headPath, 'utf8').trim();
+    const refPrefix = 'ref: refs/heads/';
+    if (!head.startsWith(refPrefix)) {
+      return undefined;
+    }
+
+    return head.slice(refPrefix.length);
+  } catch {
+    return undefined;
+  }
+}
+
+function buildDefaultOutputName(repoPath: string, github?: string): string {
+  if (github) {
+    const [owner = 'repo', repo = 'history'] = github.split('/');
+    return `${sanitizeFileSegment(owner)}-${sanitizeFileSegment(repo)}.mp4`;
+  }
+
+  const repoName = sanitizeFileSegment(path.basename(repoPath) || 'repository');
+  const branchName = sanitizeFileSegment(detectCurrentBranch(repoPath) ?? 'history');
+  return `${repoName}-${branchName}.mp4`;
 }
 
 function parsePositiveInt(value: string | undefined, label: string): number | undefined {
@@ -97,6 +137,7 @@ export function loadConfigFile(configPath?: string): z.infer<typeof fileConfigSc
 export function resolveAppConfig(cliOptions: CliGenerateOptions): AppConfig {
   const fileConfig = loadConfigFile(cliOptions.config);
   const themeName = parseTheme(cliOptions.theme) ?? fileConfig.theme ?? 'dark';
+  const repoPath = path.resolve(cliOptions.repo ?? process.cwd());
 
   const width = parsePositiveInt(cliOptions.width, 'width') ?? fileConfig.width ?? 1920;
   const height = parsePositiveInt(cliOptions.height, 'height') ?? fileConfig.height ?? 1080;
@@ -106,12 +147,17 @@ export function resolveAppConfig(cliOptions: CliGenerateOptions): AppConfig {
   const excludeBranches = cliOptions.excludeBranch?.length
     ? cliOptions.excludeBranch
     : fileConfig.excludeBranches ?? [];
+  const requestedOutput = cliOptions.output ?? fileConfig.output;
+  const defaultFileName = buildDefaultOutputName(repoPath, cliOptions.github);
+  const outputPath = cliOptions.outputDir
+    ? path.resolve(cliOptions.outputDir, requestedOutput ?? defaultFileName)
+    : path.resolve(requestedOutput ?? defaultFileName);
 
   return {
-    repoPath: path.resolve(cliOptions.repo ?? process.cwd()),
+    repoPath,
     github: cliOptions.github,
     token: cliOptions.token ?? process.env.GITHUB_TOKEN,
-    outputPath: path.resolve(cliOptions.output ?? fileConfig.output ?? 'output.mp4'),
+    outputPath,
     audioPath: cliOptions.audio ? path.resolve(cliOptions.audio) : undefined,
     keepFrames: Boolean(cliOptions.keepFrames),
     maxCommits,

@@ -48,7 +48,7 @@ This removes the global `gitvideo` command and deletes the local installation ca
 ### Local repository
 
 ```bash
-gitvideo generate --repo ./my-project -o my-project.mp4
+gitvideo generate --repo ./my-project
 ```
 
 ### GitHub repository
@@ -60,7 +60,7 @@ gitvideo generate \
   --theme dark \
   --speed 8 \
   --audio ./background.mp3 \
-  -o linux-history.mp4
+  --output-dir ~/Movies
 ```
 
 ## Options
@@ -70,9 +70,16 @@ gitvideo generate \
 - `--config <file>`: optional JSON config file, defaults to `gitvideo.config.json`
 - `--github <owner/repo>`: fetch commits from GitHub instead of a local repo
 - `--token <token>`: optional explicit token override for CI or non-interactive use
+- `--output <file>`: explicit output filename or full path
+- `--output-dir <dir>`: directory where the generated video should be written
 - `--max-commits <number>`: limit the number of commits included
 - `--exclude-branch <pattern>`: exclude branches using glob patterns such as `dependabot/*`
 - `--keep-frames`: preserve rendered PNG frames instead of deleting them after encoding
+
+If you do not pass `--output`, gitvideo now generates a filename automatically:
+
+- local repo: `<repo>-<branch>.mp4`
+- GitHub repo: `<owner>-<repo>.mp4`
 
 ## Config File
 

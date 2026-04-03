@@ -21,42 +21,43 @@ export function buildCLI(): Command {
 
   program
     .name('gitvideo')
-    .description('GitHub 커밋 히스토리를 영상으로 변환')
+    .description('Turn Git commit history into an animated video')
     .version('1.0.0');
 
-  const authCommand = program.command('auth').description('GitHub 로그인 관리');
+  const authCommand = program.command('auth').description('Manage GitHub authentication');
 
   authCommand
     .command('login')
-    .description('GitHub CLI 로그인 실행')
+    .description('Start GitHub CLI login')
     .action(async () => {
       await runGitHubLogin();
     });
 
   authCommand
     .command('status')
-    .description('GitHub CLI 로그인 상태 확인')
+    .description('Show GitHub CLI auth status')
     .action(async () => {
       await runGitHubStatus();
     });
 
   program
     .command('generate')
-    .description('영상 생성')
-    .option('-r, --repo <path>', '로컬 git 레포 경로', process.cwd())
-    .option('--github <owner/repo>', 'GitHub 레포 (예: torvalds/linux)')
-    .option('--token <token>', 'GitHub API 토큰 (기본은 gh 로그인 사용)')
-    .option('--config <file>', '설정 파일 경로')
-    .option('-o, --output <file>', '출력 파일 경로', 'output.mp4')
-    .option('--fps <number>', '프레임레이트', '30')
-    .option('--speed <number>', '커밋당 프레임 수 (낮을수록 빠름)', '15')
-    .option('--width <number>', '영상 너비', '1920')
-    .option('--height <number>', '영상 높이', '1080')
-    .option('--theme <name>', '테마 (dark|light)', 'dark')
-    .option('--audio <file>', '배경음악 파일')
-    .option('--max-commits <number>', '최대 커밋 수')
-    .option('--exclude-branch <pattern>', '제외할 브랜치 glob 패턴', collectValues, [])
-    .option('--keep-frames', '중간 프레임 PNG 보존')
+    .description('Generate a video')
+    .option('-r, --repo <path>', 'Path to a local git repository', process.cwd())
+    .option('--github <owner/repo>', 'GitHub repository, for example torvalds/linux')
+    .option('--token <token>', 'GitHub API token override; defaults to gh auth token')
+    .option('--config <file>', 'Path to a config file')
+    .option('-o, --output <file>', 'Output video file path')
+    .option('--output-dir <dir>', 'Output directory for the generated video')
+    .option('--fps <number>', 'Frame rate', '30')
+    .option('--speed <number>', 'Frames per commit; lower is faster', '15')
+    .option('--width <number>', 'Video width', '1920')
+    .option('--height <number>', 'Video height', '1080')
+    .option('--theme <name>', 'Theme (dark|light)', 'dark')
+    .option('--audio <file>', 'Background audio file')
+    .option('--max-commits <number>', 'Maximum number of commits to include')
+    .option('--exclude-branch <pattern>', 'Branch glob pattern to exclude', collectValues, [])
+    .option('--keep-frames', 'Keep intermediate PNG frames')
     .action(async (options: CliGenerateOptions) => {
       const spinner = ora();
       let framesDir: string | null = null;
@@ -69,45 +70,45 @@ export function buildCLI(): Command {
           throw new Error('FFmpeg is not installed. Install it first to encode mp4 output.');
         }
 
-        spinner.start('커밋 히스토리 수집 중...');
+        spinner.start('Collecting commit history...');
         const rawCommits = await collectCommits(config);
         if (rawCommits.length === 0) {
           throw new Error('No commits found for the selected repository and filters.');
         }
-        spinner.succeed(`커밋 ${rawCommits.length}개 수집 완료`);
+        spinner.succeed(`Collected ${rawCommits.length} commits`);
 
-        spinner.start('그래프 구성 중...');
+        spinner.start('Building graph...');
         const dagBuilder = new DAGBuilder();
         let graph = dagBuilder.build(rawCommits);
-        spinner.succeed('그래프 구성 완료');
+        spinner.succeed('Graph built');
 
-        spinner.start('레이아웃 계산 중...');
+        spinner.start('Calculating layout...');
         graph = new LayoutCalculator().calculate(graph, config.render.theme);
-        spinner.succeed('레이아웃 계산 완료');
+        spinner.succeed('Layout ready');
 
         framesDir = createTempDir('gitvideo');
-        spinner.start('프레임 렌더링 중...');
+        spinner.start('Rendering frames...');
         const animator = new Animator(graph, config.render);
         await animator.generateFrames(framesDir, (current, total) => {
-          spinner.text = `프레임 렌더링 중... ${current}/${total} 커밋`;
+          spinner.text = `Rendering frames... ${current}/${total} commits`;
         });
-        spinner.succeed('프레임 렌더링 완료');
+        spinner.succeed('Frames rendered');
 
-        spinner.start('영상 인코딩 중...');
+        spinner.start('Encoding video...');
         await encoder.encode({
           framesDir,
           outputPath: config.outputPath,
           fps: config.render.fps,
           audioPath: config.audioPath,
         });
-        spinner.succeed(`영상 생성 완료: ${chalk.green(config.outputPath)}`);
+        spinner.succeed(`Video created: ${chalk.green(config.outputPath)}`);
 
         if (config.keepFrames) {
           console.log(chalk.yellow(`Frames kept at ${framesDir}`));
           framesDir = null;
         }
       } catch (error) {
-        spinner.fail('오류 발생');
+        spinner.fail('Command failed');
         console.error(chalk.red(error instanceof Error ? error.message : String(error)));
         process.exitCode = 1;
       } finally {

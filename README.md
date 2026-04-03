@@ -26,6 +26,14 @@ curl -fsSL https://raw.githubusercontent.com/flyingsquirrel0419/gitvideo/main/sc
 
 If your npm global prefix is not writable, the installer automatically falls back to `~/.local` and tells you which `PATH` entry to add.
 
+## Uninstall With `curl`
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/flyingsquirrel0419/gitvideo/main/scripts/uninstall.sh | bash
+```
+
+This removes the global `gitvideo` command and deletes the local installation cache under `~/.gitvideo`.
+
 ## Usage
 
 ### Local repository

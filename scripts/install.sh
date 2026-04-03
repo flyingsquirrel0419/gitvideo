@@ -71,6 +71,7 @@ SOURCE_DIR="$(find "$TMP_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
 [[ -n "$SOURCE_DIR" ]] || fail "Failed to unpack release archive."
 
 APP_DIR="$INSTALL_ROOT/$TAG"
+CURRENT_LINK="$INSTALL_ROOT/current"
 mkdir -p "$INSTALL_ROOT"
 rm -rf "$APP_DIR"
 cp -R "$SOURCE_DIR" "$APP_DIR"
@@ -92,6 +93,10 @@ fi
 
 log "Running npm link"
 npm link
+
+ln -sfn "$APP_DIR" "$CURRENT_LINK"
+printf '%s\n' "$REPO_SLUG" > "$INSTALL_ROOT/repo"
+printf '%s\n' "$TAG" > "$INSTALL_ROOT/version"
 
 GLOBAL_BIN_DIR="$(npm prefix -g)/bin"
 case ":$PATH:" in

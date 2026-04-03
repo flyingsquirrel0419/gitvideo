@@ -43,3 +43,4 @@ jobs:
           generate_release_notes: true
           files: |
             scripts/install.sh
+            scripts/uninstall.sh

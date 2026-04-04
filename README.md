@@ -79,6 +79,7 @@ gitvideo generate \
   --github flyingsquirrel0419/layercache \
   --theme dark \
   --speed 8 \
+  --render-workers 4 \
   --output-dir ~/Downloads
 ```
 
@@ -91,6 +92,7 @@ gitvideo generate \
 - `--token <token>`: optional explicit token override for CI or non-interactive use
 - `--output <file>`: explicit output filename or full path
 - `--output-dir <dir>`: directory where the generated video should be written
+- `--render-workers <number>`: render frames in multiple Node processes; useful for large histories, defaults to `1`
 - `--max-commits <number>`: limit the number of commits included
 - `--exclude-branch <pattern>`: exclude branches using glob patterns such as `dependabot/*`
 - `--keep-frames`: preserve rendered PNG frames instead of deleting them after encoding
@@ -103,6 +105,7 @@ Create `gitvideo.config.json` if you want reusable defaults:
 {
   "fps": 30,
   "framesPerCommit": 15,
+  "renderWorkers": 1,
   "width": 1920,
   "height": 1080,
   "theme": "dark",

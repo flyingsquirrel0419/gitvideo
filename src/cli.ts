@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
@@ -72,6 +73,7 @@ export function buildCLI(): Command {
     .option('--output-dir <dir>', 'Output directory for the generated video')
     .option('--fps <number>', 'Frame rate', '30')
     .option('--speed <number>', 'Frames per commit; lower is faster', '15')
+    .option('--render-workers <number>', 'Frame render worker count; defaults to auto')
     .option('--width <number>', 'Video width', '1920')
     .option('--height <number>', 'Video height', '1080')
     .option('--theme <name>', 'Theme (dark|light)', 'dark')
@@ -123,6 +125,7 @@ export function buildCLI(): Command {
 
         const totalFrameCount = rawCommits.length * config.render.framesPerCommit + config.render.fps;
         const expectedDurationSeconds = totalFrameCount / config.render.fps;
+        fs.mkdirSync(path.dirname(config.outputPath), { recursive: true });
 
         spinner.start(stageText('Encoding video', 85));
         await encoder.encode({

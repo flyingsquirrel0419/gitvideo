@@ -53,4 +53,14 @@ describe('resolveAppConfig', () => {
     expect(path.dirname(config.outputPath)).toBe(outputDir);
     expect(path.basename(config.outputPath)).toMatch(/^gitvideo-config-[a-z0-9]+-main\.mp4$/);
   });
+
+  it('accepts an explicit render worker count', () => {
+    const repoPath = createRepo('main');
+    const config = resolveAppConfig({
+      repo: repoPath,
+      renderWorkers: '3',
+    });
+
+    expect(config.render.renderWorkers).toBe(3);
+  });
 });

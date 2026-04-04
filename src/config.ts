@@ -9,6 +9,7 @@ export const fileConfigSchema = z.object({
   framesPerCommit: z.number().int().positive().optional(),
   width: z.number().int().positive().optional(),
   height: z.number().int().positive().optional(),
+  renderWorkers: z.number().int().positive().optional(),
   theme: z.enum(['dark', 'light']).optional(),
   output: z.string().min(1).optional(),
   maxCommits: z.number().int().positive().optional(),
@@ -23,6 +24,7 @@ export interface CliGenerateOptions {
   outputDir?: string;
   fps?: string;
   speed?: string;
+  renderWorkers?: string;
   width?: string;
   height?: string;
   theme?: string;
@@ -143,6 +145,9 @@ export function resolveAppConfig(cliOptions: CliGenerateOptions): AppConfig {
   const height = parsePositiveInt(cliOptions.height, 'height') ?? fileConfig.height ?? 1080;
   const fps = parsePositiveInt(cliOptions.fps, 'fps') ?? fileConfig.fps ?? 30;
   const framesPerCommit = parsePositiveInt(cliOptions.speed, 'speed') ?? fileConfig.framesPerCommit ?? 15;
+  const renderWorkers = parsePositiveInt(cliOptions.renderWorkers, 'renderWorkers')
+    ?? fileConfig.renderWorkers
+    ?? 1;
   const maxCommits = parsePositiveInt(cliOptions.maxCommits, 'maxCommits') ?? fileConfig.maxCommits;
   const excludeBranches = cliOptions.excludeBranch?.length
     ? cliOptions.excludeBranch
@@ -168,6 +173,7 @@ export function resolveAppConfig(cliOptions: CliGenerateOptions): AppConfig {
       height,
       fps,
       framesPerCommit,
+      renderWorkers,
       theme: resolveTheme(themeName),
     },
   };

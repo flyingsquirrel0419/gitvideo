@@ -17,6 +17,7 @@ export interface RenderConfig {
   height: number;
   fps: number;
   framesPerCommit: number;
+  renderWorkers: number;
   theme: Theme;
 }
 

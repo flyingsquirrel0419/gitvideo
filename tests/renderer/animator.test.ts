@@ -43,6 +43,7 @@ describe('Animator', () => {
       height: 600,
       fps: 2,
       framesPerCommit: 2,
+      renderWorkers: 1,
       theme: DARK_THEME,
     });
 

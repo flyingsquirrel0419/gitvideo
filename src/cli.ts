@@ -16,6 +16,13 @@ function collectValues(value: string, previous: string[]): string[] {
   return [...previous, value];
 }
 
+function toPercent(current: number, total: number): number {
+  if (total <= 0) {
+    return 0;
+  }
+  return Math.min(100, Math.round((current / total) * 100));
+}
+
 export function buildCLI(): Command {
   const program = new Command();
 
@@ -90,7 +97,7 @@ export function buildCLI(): Command {
         spinner.start('Rendering frames...');
         const animator = new Animator(graph, config.render);
         await animator.generateFrames(framesDir, (current, total) => {
-          spinner.text = `Rendering frames... ${current}/${total} commits`;
+          spinner.text = `Rendering frames... ${toPercent(current, total)}% (${current}/${total} commits)`;
         });
         spinner.succeed('Frames rendered');
 

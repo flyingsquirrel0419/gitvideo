@@ -9,58 +9,77 @@
 - FFmpeg
 - GitHub CLI (`gh`) for login-based GitHub access
 
-## Install From Source
+## Quick Start
 
-```bash
-npm install
-npm run build
-```
-
-## Install With `curl`
-
-The installer downloads the latest GitHub release source archive, runs `npm install`, builds the CLI, and finishes with `npm link` so `gitvideo` is available on your shell.
-
-macOS prerequisites:
+### macOS prerequisites
 
 ```bash
 brew install node@22 ffmpeg gh pkg-config cairo pango libpng jpeg giflib librsvg pixman
+export PATH="/opt/homebrew/opt/node@22/bin:$PATH"
 ```
 
-If your shell is still using Node 24, switch to Node 22 LTS before installing.
 Do not run the installer with `sudo`.
+
+### Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/flyingsquirrel0419/gitvideo/main/scripts/install.sh | bash -s -- flyingsquirrel0419/gitvideo
 ```
 
-If your npm global prefix is not writable, the installer automatically falls back to `~/.local` and tells you which `PATH` entry to add.
+### Update
 
-## Uninstall With `curl`
+```bash
+curl -fsSL https://raw.githubusercontent.com/flyingsquirrel0419/gitvideo/main/scripts/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/flyingsquirrel0419/gitvideo/main/scripts/install.sh | bash -s -- flyingsquirrel0419/gitvideo
+```
+
+### Remove
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/flyingsquirrel0419/gitvideo/main/scripts/uninstall.sh | bash
 ```
 
-This removes the global `gitvideo` command and deletes the local installation cache under `~/.gitvideo`.
+## First Run
 
-## Usage
+```bash
+gitvideo auth login
+gitvideo --help
+```
 
-### Local repository
+## Common Usage
+
+### Generate from a local repository
 
 ```bash
 gitvideo generate --repo ./my-project
 ```
 
-### GitHub repository
+Default output filename:
+
+- local repo: `<repo>-<branch>.mp4`
+- GitHub repo: `<owner>-<repo>.mp4`
+
+### Generate into a specific folder
+
+```bash
+gitvideo generate --repo ./my-project --output-dir ~/Downloads
+```
+
+### Generate with an explicit filename
+
+```bash
+gitvideo generate --repo ./my-project -o ~/Downloads/my-project-history.mp4
+```
+
+### Generate from GitHub
 
 ```bash
 gitvideo auth login
 gitvideo generate \
-  --github torvalds/linux \
+  --github flyingsquirrel0419/layercache \
   --theme dark \
   --speed 8 \
-  --audio ./background.mp3 \
-  --output-dir ~/Movies
+  --output-dir ~/Downloads
 ```
 
 ## Options
@@ -75,11 +94,6 @@ gitvideo generate \
 - `--max-commits <number>`: limit the number of commits included
 - `--exclude-branch <pattern>`: exclude branches using glob patterns such as `dependabot/*`
 - `--keep-frames`: preserve rendered PNG frames instead of deleting them after encoding
-
-If you do not pass `--output`, gitvideo now generates a filename automatically:
-
-- local repo: `<repo>-<branch>.mp4`
-- GitHub repo: `<owner>-<repo>.mp4`
 
 ## Config File
 
@@ -100,6 +114,13 @@ Create `gitvideo.config.json` if you want reusable defaults:
 
 CLI flags override values from the config file.
 
+## Install From Source
+
+```bash
+npm install
+npm run build
+```
+
 ## Development
 
 ```bash
@@ -108,13 +129,7 @@ npm run build
 npm run lint
 ```
 
-## Release
+## Notes
 
-Create a public GitHub repository, push this project, and publish a tag:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-The GitHub Actions release workflow runs tests, builds the project, and creates a GitHub Release for that tag.
+- If your shell is still using Node 24, switch to Node 22 LTS before installing.
+- If your npm global prefix is not writable, the installer falls back to `~/.local` and prints the PATH entry to add.

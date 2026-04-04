@@ -16,11 +16,19 @@ function collectValues(value: string, previous: string[]): string[] {
   return [...previous, value];
 }
 
-function toPercent(current: number, total: number): number {
+function mapProgress(progress: number, start: number, end: number): number {
+  return Math.round(start + (end - start) * Math.max(0, Math.min(1, progress)));
+}
+
+function toPercent(current: number, total: number, start: number, end: number): number {
   if (total <= 0) {
-    return 0;
+    return start;
   }
-  return Math.min(100, Math.round((current / total) * 100));
+  return mapProgress(current / total, start, end);
+}
+
+function stageText(label: string, percent: number, detail?: string): string {
+  return detail ? `${label}... ${percent}% (${detail})` : `${label}... ${percent}%`;
 }
 
 export function buildCLI(): Command {
@@ -77,38 +85,49 @@ export function buildCLI(): Command {
           throw new Error('FFmpeg is not installed. Install it first to encode mp4 output.');
         }
 
-        spinner.start('Collecting commit history...');
+        spinner.start(stageText('Collecting commit history', 5));
         const rawCommits = await collectCommits(config);
         if (rawCommits.length === 0) {
           throw new Error('No commits found for the selected repository and filters.');
         }
-        spinner.succeed(`Collected ${rawCommits.length} commits`);
+        spinner.succeed(stageText('Collected commits', 20, `${rawCommits.length} commits`));
 
-        spinner.start('Building graph...');
+        spinner.start(stageText('Building graph', 25));
         const dagBuilder = new DAGBuilder();
         let graph = dagBuilder.build(rawCommits);
-        spinner.succeed('Graph built');
+        spinner.succeed(stageText('Graph built', 40));
 
-        spinner.start('Calculating layout...');
+        spinner.start(stageText('Calculating layout', 45));
         graph = new LayoutCalculator().calculate(graph, config.render.theme);
-        spinner.succeed('Layout ready');
+        spinner.succeed(stageText('Layout ready', 55));
 
         framesDir = createTempDir('gitvideo');
-        spinner.start('Rendering frames...');
+        spinner.start(stageText('Rendering frames', 55));
         const animator = new Animator(graph, config.render);
         await animator.generateFrames(framesDir, (current, total) => {
-          spinner.text = `Rendering frames... ${toPercent(current, total)}% (${current}/${total} commits)`;
+          spinner.text = stageText(
+            'Rendering frames',
+            toPercent(current, total, 55, 85),
+            `${current}/${total} commits`,
+          );
         });
-        spinner.succeed('Frames rendered');
+        spinner.succeed(stageText('Frames rendered', 85));
 
-        spinner.start('Encoding video...');
+        const totalFrameCount = rawCommits.length * config.render.framesPerCommit + config.render.fps;
+        const expectedDurationSeconds = totalFrameCount / config.render.fps;
+
+        spinner.start(stageText('Encoding video', 85));
         await encoder.encode({
           framesDir,
           outputPath: config.outputPath,
           fps: config.render.fps,
           audioPath: config.audioPath,
+          expectedDurationSeconds,
+          onProgress: (progress) => {
+            spinner.text = stageText('Encoding video', mapProgress(progress, 85, 100));
+          },
         });
-        spinner.succeed(`Video created: ${chalk.green(config.outputPath)}`);
+        spinner.succeed(`Video created: ${chalk.green(config.outputPath)} (100%)`);
 
         if (config.keepFrames) {
           console.log(chalk.yellow(`Frames kept at ${framesDir}`));

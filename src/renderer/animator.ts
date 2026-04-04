@@ -23,6 +23,7 @@ export class Animator {
     const animOrder = [...this.graph.orderedShas].reverse();
     const visibleNodes = new Set<string>();
     let frameIndex = 0;
+    const totalFrames = animOrder.length * this.config.framesPerCommit + this.config.fps;
 
     for (let commitIndex = 0; commitIndex < animOrder.length; commitIndex += 1) {
       const sha = animOrder[commitIndex];
@@ -42,9 +43,8 @@ export class Animator {
 
         this.writeFrame(outputDir, frameIndex, frame);
         frameIndex += 1;
+        onProgress?.(frameIndex, totalFrames);
       }
-
-      onProgress?.(commitIndex + 1, animOrder.length);
     }
 
     const finalFrame: AnimationFrame = {
@@ -60,6 +60,7 @@ export class Animator {
     for (let holdIndex = 0; holdIndex < this.config.fps; holdIndex += 1) {
       this.writeFrame(outputDir, frameIndex, finalFrame);
       frameIndex += 1;
+      onProgress?.(frameIndex, totalFrames);
     }
   }
 

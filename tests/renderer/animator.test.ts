@@ -46,8 +46,13 @@ describe('Animator', () => {
       theme: DARK_THEME,
     });
 
-    await animator.generateFrames(outputDir);
+    const progressEvents: Array<{ current: number; total: number }> = [];
+
+    await animator.generateFrames(outputDir, (current, total) => {
+      progressEvents.push({ current, total });
+    });
     const generated = fs.readdirSync(outputDir).filter((file) => file.endsWith('.png'));
     expect(generated.length).toBe(6);
+    expect(progressEvents.at(-1)).toEqual({ current: 6, total: 6 });
   });
 });

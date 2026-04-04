@@ -17,7 +17,7 @@ function collectValues(value: string, previous: string[]): string[] {
 }
 
 function mapProgress(progress: number, start: number, end: number): number {
-  return Math.round(start + (end - start) * Math.max(0, Math.min(1, progress)));
+  return start + (end - start) * Math.max(0, Math.min(1, progress));
 }
 
 function toPercent(current: number, total: number, start: number, end: number): number {
@@ -27,8 +27,14 @@ function toPercent(current: number, total: number, start: number, end: number): 
   return mapProgress(current / total, start, end);
 }
 
+function formatPercent(percent: number): string {
+  return `${percent.toFixed(1)}%`;
+}
+
 function stageText(label: string, percent: number, detail?: string): string {
-  return detail ? `${label}... ${percent}% (${detail})` : `${label}... ${percent}%`;
+  return detail
+    ? `${label}... ${formatPercent(percent)} overall (${detail})`
+    : `${label}... ${formatPercent(percent)} overall`;
 }
 
 export function buildCLI(): Command {
@@ -105,10 +111,12 @@ export function buildCLI(): Command {
         spinner.start(stageText('Rendering frames', 55));
         const animator = new Animator(graph, config.render);
         await animator.generateFrames(framesDir, (current, total) => {
+          const overallPercent = toPercent(current, total, 55, 85);
+          const renderPercent = toPercent(current, total, 0, 100);
           spinner.text = stageText(
             'Rendering frames',
-            toPercent(current, total, 55, 85),
-            `${current}/${total} commits`,
+            overallPercent,
+            `${formatPercent(renderPercent)} render, ${current}/${total} frames`,
           );
         });
         spinner.succeed(stageText('Frames rendered', 85));
@@ -124,10 +132,14 @@ export function buildCLI(): Command {
           audioPath: config.audioPath,
           expectedDurationSeconds,
           onProgress: (progress) => {
-            spinner.text = stageText('Encoding video', mapProgress(progress, 85, 100));
+            spinner.text = stageText(
+              'Encoding video',
+              mapProgress(progress, 85, 100),
+              `${formatPercent(mapProgress(progress, 0, 100))} encode`,
+            );
           },
         });
-        spinner.succeed(`Video created: ${chalk.green(config.outputPath)} (100%)`);
+        spinner.succeed(`Video created: ${chalk.green(config.outputPath)} (${formatPercent(100)})`);
 
         if (config.keepFrames) {
           console.log(chalk.yellow(`Frames kept at ${framesDir}`));

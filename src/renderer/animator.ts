@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fork, type ForkOptions } from 'node:child_process';
 import { type CommitEdge, type CommitGraph } from '../graph/types';
+import { calculateViewportOffsetY } from './camera';
 import { FrameRenderer } from './frameRenderer';
 import { type AnimationFrame, type RenderConfig } from './types';
 import { type ActivatedEdge, type RenderWorkerData, type RenderWorkerMessage } from './workerTypes';
@@ -70,6 +71,7 @@ export class Animator {
           visibleEdges,
           highlightSha: sha,
           progress: (step + 1) / this.config.framesPerCommit,
+          viewportOffsetY: this.calculateViewportOffset(sha),
         };
 
         this.writeFrame(outputDir, frameIndex, frame);
@@ -84,6 +86,7 @@ export class Animator {
       visibleEdges,
       highlightSha: null,
       progress: 1,
+      viewportOffsetY: this.calculateViewportOffset(animOrder.at(-1) ?? null),
     };
 
     for (let holdIndex = 0; holdIndex < this.config.fps; holdIndex += 1) {
@@ -242,5 +245,18 @@ export class Animator {
     const buffer = this.renderer.renderFrame(frame);
     const filename = path.join(outputDir, `frame_${String(frameIndex).padStart(6, '0')}.png`);
     fs.writeFileSync(filename, buffer);
+  }
+
+  private calculateViewportOffset(sha: string | null): number {
+    if (!sha) {
+      return 0;
+    }
+
+    const node = this.graph.nodes.get(sha);
+    if (!node) {
+      return 0;
+    }
+
+    return calculateViewportOffsetY(this.graph.totalHeight, this.config.height, node.y);
   }
 }

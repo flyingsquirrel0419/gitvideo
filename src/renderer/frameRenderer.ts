@@ -1,5 +1,6 @@
 import { createCanvas, type Canvas, type CanvasRenderingContext2D } from 'canvas';
 import { type CommitEdge, type CommitGraph, type CommitNode } from '../graph/types';
+import { VERTICAL_VIEWPORT_MARGIN } from './camera';
 import { type AnimationFrame, type RenderConfig } from './types';
 
 interface Point {
@@ -11,6 +12,7 @@ export class FrameRenderer {
   private static readonly VIEWPORT_MARGIN = 20;
   private readonly canvas: Canvas;
   private readonly ctx: CanvasRenderingContext2D;
+  private currentViewportOffsetY = 0;
 
   constructor(
     private readonly graph: CommitGraph,
@@ -22,6 +24,7 @@ export class FrameRenderer {
 
   renderFrame(frame: AnimationFrame): Buffer {
     const { ctx } = this;
+    this.currentViewportOffsetY = frame.viewportOffsetY;
     ctx.save();
     ctx.fillStyle = this.config.theme.background;
     ctx.fillRect(0, 0, this.config.width, this.config.height);
@@ -206,7 +209,7 @@ export class FrameRenderer {
   private transformPoint(x: number, y: number): Point {
     const scale = this.getHorizontalScale();
     const offsetX = Math.max((this.config.width - this.graph.totalWidth * scale) / 2, 0);
-    const offsetY = 20;
+    const offsetY = VERTICAL_VIEWPORT_MARGIN - this.currentViewportOffsetY;
     return { x: x * scale + offsetX, y: y + offsetY };
   }
 

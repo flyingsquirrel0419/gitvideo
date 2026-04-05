@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { calculateViewportOffsetY } from './camera';
 import { FrameRenderer } from './frameRenderer';
 import { type AnimationFrame } from './types';
 import { type ActivatedEdge, type RenderWorkerData, type RenderWorkerMessage } from './workerTypes';
@@ -74,6 +75,11 @@ function run(workerData: RenderWorkerData): void {
         visibleEdges,
         highlightSha: sha,
         progress: (step + 1) / config.framesPerCommit,
+        viewportOffsetY: calculateViewportOffsetY(
+          graph.totalHeight,
+          config.height,
+          graph.nodes.get(sha)?.y ?? 0,
+        ),
       };
 
       writeFrame(renderer, outputDir, frameIndex, frame);
@@ -89,6 +95,11 @@ function run(workerData: RenderWorkerData): void {
       visibleEdges,
       highlightSha: null,
       progress: 1,
+      viewportOffsetY: calculateViewportOffsetY(
+        graph.totalHeight,
+        config.height,
+        graph.nodes.get(animOrder.at(-1) ?? '')?.y ?? 0,
+      ),
     };
 
     for (let holdIndex = 0; holdIndex < config.fps; holdIndex += 1) {

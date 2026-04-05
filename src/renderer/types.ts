@@ -27,4 +27,5 @@ export interface AnimationFrame {
   visibleEdges: CommitEdge[];
   highlightSha: string | null;
   progress: number;
+  viewportOffsetY: number;
 }

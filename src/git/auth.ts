@@ -72,7 +72,7 @@ export async function runGitHubLogin(): Promise<void> {
     throw new Error('GitHub CLI is not installed. Install it with `brew install gh`.');
   }
 
-  await runInteractive('gh', ['auth', 'login', '--web', '--git-protocol', 'https', '-s', 'repo']);
+  await runInteractive('gh', ['auth', 'login', '--web', '-s', 'repo']);
 }
 
 export async function runGitHubStatus(): Promise<void> {

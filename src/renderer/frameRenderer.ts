@@ -27,8 +27,15 @@ export class FrameRenderer {
     this.currentViewportOffsetY = frame.viewportOffsetY;
     this.drawBackground(frame);
 
+    const currentFocus = frame.highlightSha
+      ? this.easeOutQuint(frame.progress)
+      : 0;
+    const previousFocus = frame.previousHighlightSha
+      ? 1 - this.easeInOutCubic(frame.progress)
+      : 0;
+
     for (const edge of frame.visibleEdges) {
-      this.drawEdge(edge, frame.highlightSha);
+      this.drawEdge(edge, frame.highlightSha, currentFocus, frame.previousHighlightSha, previousFocus);
     }
 
     for (const sha of frame.visibleNodeShas) {
@@ -37,9 +44,13 @@ export class FrameRenderer {
         continue;
       }
 
-      const isHighlight = sha === frame.highlightSha;
-      const progress = isHighlight ? frame.progress : 1;
-      this.drawNode(node, progress, isHighlight);
+      const isCurrentHighlight = sha === frame.highlightSha;
+      const isPreviousHighlight = sha === frame.previousHighlightSha && sha !== frame.highlightSha;
+      const drawProgress = isCurrentHighlight ? frame.progress : 1;
+      const focusStrength = isCurrentHighlight
+        ? currentFocus
+        : (isPreviousHighlight ? previousFocus * 0.8 : 0);
+      this.drawNode(node, drawProgress, focusStrength, isCurrentHighlight);
     }
 
     for (const sha of frame.visibleNodeShas) {
@@ -52,23 +63,34 @@ export class FrameRenderer {
     return this.canvas.toBuffer('image/png');
   }
 
-  private drawEdge(edge: CommitEdge, highlightSha: string | null): void {
+  private drawEdge(
+    edge: CommitEdge,
+    highlightSha: string | null,
+    highlightStrength: number,
+    previousHighlightSha: string | null,
+    previousHighlightStrength: number,
+  ): void {
     const { ctx } = this;
     const scale = this.getHorizontalScale();
     const from = this.transformPoint(edge.fromX, edge.fromY);
     const to = this.transformPoint(edge.toX, edge.toY);
-    const isHighlight = highlightSha === edge.fromSha;
+    const currentStrength = highlightSha === edge.fromSha ? highlightStrength : 0;
+    const trailingStrength = previousHighlightSha === edge.fromSha ? previousHighlightStrength * 0.6 : 0;
+    const emphasis = Math.max(currentStrength, trailingStrength);
 
     ctx.save();
     ctx.beginPath();
     ctx.strokeStyle = edge.laneColor;
-    ctx.lineWidth = Math.max(this.config.theme.edgeWidth * scale * (isHighlight ? 1.4 : 1), 1);
+    ctx.lineWidth = Math.max(
+      this.config.theme.edgeWidth * scale * (1 + emphasis * 0.6),
+      1,
+    );
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    ctx.globalAlpha = isHighlight ? 0.95 : 0.45;
-    if (isHighlight) {
-      ctx.shadowColor = this.applyAlpha(edge.laneColor, 0.8);
-      ctx.shadowBlur = 18 * scale;
+    ctx.globalAlpha = 0.3 + emphasis * 0.65;
+    if (emphasis > 0.05) {
+      ctx.shadowColor = this.applyAlpha(edge.laneColor, 0.35 + emphasis * 0.5);
+      ctx.shadowBlur = (10 + emphasis * 14) * scale;
     }
 
     if (from.x === to.x) {
@@ -84,20 +106,27 @@ export class FrameRenderer {
     ctx.restore();
   }
 
-  private drawNode(node: CommitNode, progress: number, isHighlight: boolean): void {
+  private drawNode(
+    node: CommitNode,
+    progress: number,
+    focusStrength: number,
+    isCurrentHighlight: boolean,
+  ): void {
     const { ctx } = this;
     const theme = this.config.theme;
     const scale = this.getHorizontalScale();
-    const easedProgress = this.easeOutCubic(progress);
+    const easedProgress = this.easeOutBack(progress);
     const { x, y } = this.transformPoint(node.x, node.y);
     const laneColor = theme.nodeColors[node.laneIndex % theme.nodeColors.length];
     const color = node.isMerge ? theme.mergeNodeColor : laneColor;
-    const radius = Math.max(theme.nodeRadius * easedProgress * scale, 1);
+    const baseRadius = theme.nodeRadius * scale;
+    const revealScale = isCurrentHighlight ? (0.72 + easedProgress * 0.28) : 1;
+    const radius = Math.max(baseRadius * revealScale * (1 + focusStrength * 0.18), 1);
 
     ctx.save();
-    if (isHighlight && progress > 0.35) {
+    if (focusStrength > 0.04) {
       ctx.shadowColor = color;
-      ctx.shadowBlur = 24 * scale;
+      ctx.shadowBlur = (8 + 22 * focusStrength) * scale;
     }
 
     ctx.beginPath();
@@ -109,20 +138,20 @@ export class FrameRenderer {
     ctx.stroke();
     ctx.restore();
 
-    if (isHighlight) {
-      this.drawNodePulse(x, y, radius, color, easedProgress);
+    if (focusStrength > 0.05) {
+      this.drawNodePulse(x, y, radius, color, focusStrength, progress);
     }
 
     if (progress <= 0.35) {
       return;
     }
 
-    const alpha = this.easeOutCubic((progress - 0.35) / 0.65);
+    const alpha = this.easeOutQuint((progress - 0.2) / 0.8);
     const message = node.message.length > 45 ? `${node.message.slice(0, 45)}...` : node.message;
     const shaFontSize = this.getScaledFontSize(theme.shaFontSize, 8);
     const labelFontSize = this.getScaledFontSize(theme.labelFontSize, 9);
     const gap = Math.max(6 * scale, 4);
-    const lift = (1 - alpha) * 10;
+    const lift = (1 - alpha) * 18;
 
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -145,7 +174,7 @@ export class FrameRenderer {
     if (drawRight) {
       const cardX = preferredLeft - 10;
       const cardWidth = Math.max(shaWidth + gap + this.measureTextWidth(fittedMessage, `${labelFontSize}px ${theme.fontFamily}`) + 18, 56);
-      this.drawTextSurface(cardX, textY - 17 - lift, cardWidth, 30);
+      this.drawTextSurface(cardX, textY - 17 - lift, cardWidth, 30, alpha);
       ctx.font = `${shaFontSize}px ${theme.fontFamily}`;
       ctx.fillText(node.shortSha, preferredLeft, textY - lift);
       ctx.font = `${labelFontSize}px ${theme.fontFamily}`;
@@ -158,7 +187,7 @@ export class FrameRenderer {
     const fittedMessageWidth = ctx.measureText(fittedMessage).width;
     const rightEdge = Math.max(leftAnchor, FrameRenderer.VIEWPORT_MARGIN + shaWidth + gap + fittedMessageWidth);
     const leftCardX = Math.max(rightEdge - (shaWidth + gap + fittedMessageWidth + 18), FrameRenderer.VIEWPORT_MARGIN);
-    this.drawTextSurface(leftCardX, textY - 17 - lift, rightEdge - leftCardX + 10, 30);
+    this.drawTextSurface(leftCardX, textY - 17 - lift, rightEdge - leftCardX + 10, 30, alpha);
     ctx.font = `${labelFontSize}px ${theme.fontFamily}`;
     ctx.textAlign = 'right';
     ctx.fillText(fittedMessage, rightEdge, textY - lift);
@@ -267,11 +296,25 @@ export class FrameRenderer {
       const node = this.graph.nodes.get(frame.highlightSha);
       if (node) {
         const point = this.transformPoint(node.x, node.y);
-        const spot = ctx.createRadialGradient(point.x, point.y, 0, point.x, point.y, width * 0.32);
-        spot.addColorStop(0, this.applyAlpha(theme.glowColor, 0.14));
+        const spot = ctx.createRadialGradient(point.x, point.y, 0, point.x, point.y, width * 0.34);
+        spot.addColorStop(0, this.applyAlpha(theme.glowColor, 0.08 + this.easeOutQuint(frame.progress) * 0.1));
         spot.addColorStop(1, this.applyAlpha(theme.glowColor, 0));
         ctx.save();
         ctx.fillStyle = spot;
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+      }
+    }
+
+    if (frame.previousHighlightSha && frame.previousHighlightSha !== frame.highlightSha) {
+      const previousNode = this.graph.nodes.get(frame.previousHighlightSha);
+      if (previousNode) {
+        const point = this.transformPoint(previousNode.x, previousNode.y);
+        const trail = ctx.createRadialGradient(point.x, point.y, 0, point.x, point.y, width * 0.26);
+        trail.addColorStop(0, this.applyAlpha(theme.glowColor, 0.08 * (1 - this.easeInOutCubic(frame.progress))));
+        trail.addColorStop(1, this.applyAlpha(theme.glowColor, 0));
+        ctx.save();
+        ctx.fillStyle = trail;
         ctx.fillRect(0, 0, width, height);
         ctx.restore();
       }
@@ -293,26 +336,41 @@ export class FrameRenderer {
     ctx.restore();
   }
 
-  private drawNodePulse(x: number, y: number, radius: number, color: string, progress: number): void {
+  private drawNodePulse(
+    x: number,
+    y: number,
+    radius: number,
+    color: string,
+    focusStrength: number,
+    progress: number,
+  ): void {
     const { ctx } = this;
-    const pulseRadius = radius + 10 + (1 - progress) * 12;
+    const pulseRadius = radius + 8 + Math.sin(progress * Math.PI) * 14;
     ctx.save();
-    ctx.globalAlpha = 0.18 * progress;
+    ctx.globalAlpha = 0.12 + focusStrength * 0.16;
     ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5 + focusStrength;
     ctx.beginPath();
     ctx.arc(x, y, pulseRadius, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
 
-  private drawTextSurface(x: number, y: number, width: number, height: number): void {
+  private drawTextSurface(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    alpha: number,
+  ): void {
     const { ctx } = this;
     ctx.save();
-    ctx.fillStyle = this.config.theme.surfaceColor;
+    ctx.fillStyle = this.applyAlpha(this.config.theme.surfaceColor, 0.78 + alpha * 0.16);
     this.fillRoundedRect(x, y, width, height, 10);
-    ctx.strokeStyle = this.applyAlpha(this.config.theme.surfaceBorder, 0.7);
+    ctx.strokeStyle = this.applyAlpha(this.config.theme.surfaceBorder, 0.45 + alpha * 0.35);
     ctx.lineWidth = 1;
+    ctx.shadowColor = this.applyAlpha(this.config.theme.glowColor, alpha * 0.12);
+    ctx.shadowBlur = 16 * alpha;
     ctx.stroke();
     ctx.restore();
   }
@@ -386,18 +444,52 @@ export class FrameRenderer {
     return 1 - (1 - clamped) ** 3;
   }
 
-  private applyAlpha(color: string, alpha: number): string {
-    if (!color.startsWith('#')) {
-      return color;
+  private easeOutQuint(value: number): number {
+    const clamped = this.clamp(value, 0, 1);
+    return 1 - (1 - clamped) ** 5;
+  }
+
+  private easeInOutCubic(value: number): number {
+    const clamped = this.clamp(value, 0, 1);
+    if (clamped < 0.5) {
+      return 4 * clamped ** 3;
     }
 
-    const hex = color.slice(1);
-    const normalized = hex.length === 3
-      ? hex.split('').map((char) => char + char).join('')
-      : hex;
-    const red = Number.parseInt(normalized.slice(0, 2), 16);
-    const green = Number.parseInt(normalized.slice(2, 4), 16);
-    const blue = Number.parseInt(normalized.slice(4, 6), 16);
-    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+    return 1 - ((-2 * clamped + 2) ** 3) / 2;
+  }
+
+  private easeOutBack(value: number): number {
+    const clamped = this.clamp(value, 0, 1);
+    const c1 = 1.70158;
+    const c3 = c1 + 1;
+    return 1 + c3 * (clamped - 1) ** 3 + c1 * (clamped - 1) ** 2;
+  }
+
+  private applyAlpha(color: string, alpha: number): string {
+    if (color.startsWith('#')) {
+      const hex = color.slice(1);
+      const normalized = hex.length === 3
+        ? hex.split('').map((char) => char + char).join('')
+        : hex;
+      const red = Number.parseInt(normalized.slice(0, 2), 16);
+      const green = Number.parseInt(normalized.slice(2, 4), 16);
+      const blue = Number.parseInt(normalized.slice(4, 6), 16);
+      return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+    }
+
+    if (color.startsWith('rgba(')) {
+      const [red = '0', green = '0', blue = '0'] = color
+        .slice(5, -1)
+        .split(',')
+        .map((part) => part.trim());
+      return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+    }
+
+    if (color.startsWith('rgb(')) {
+      const channels = color.slice(4, -1);
+      return `rgba(${channels}, ${alpha})`;
+    }
+
+    return color;
   }
 }

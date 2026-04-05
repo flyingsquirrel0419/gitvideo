@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { calculateViewportOffsetY } from './camera';
+import { calculateViewportOffsetY, interpolateViewportOffsetY } from './camera';
 import { FrameRenderer } from './frameRenderer';
 import { type AnimationFrame } from './types';
 import { type ActivatedEdge, type RenderWorkerData, type RenderWorkerMessage } from './workerTypes';
@@ -60,6 +60,7 @@ function run(workerData: RenderWorkerData): void {
 
   for (let commitIndex = startCommitIndex; commitIndex < endCommitIndex; commitIndex += 1) {
     const sha = animOrder[commitIndex];
+    const previousSha = commitIndex > 0 ? animOrder[commitIndex - 1] : null;
     visibleNodes.add(sha);
 
     while (edgeIndex < activatedEdges.length && activatedEdges[edgeIndex].activationIndex <= commitIndex) {
@@ -69,16 +70,20 @@ function run(workerData: RenderWorkerData): void {
 
     for (let step = 0; step < config.framesPerCommit; step += 1) {
       const frameIndex = commitIndex * config.framesPerCommit + step;
+      const progress = (step + 1) / config.framesPerCommit;
+      const previousY = graph.nodes.get(previousSha ?? '')?.y ?? graph.nodes.get(sha)?.y ?? 0;
+      const currentY = graph.nodes.get(sha)?.y ?? previousY;
       const frame: AnimationFrame = {
         frameIndex,
         visibleNodeShas: visibleNodes,
         visibleEdges,
         highlightSha: sha,
-        progress: (step + 1) / config.framesPerCommit,
-        viewportOffsetY: calculateViewportOffsetY(
-          graph.totalHeight,
-          config.height,
-          graph.nodes.get(sha)?.y ?? 0,
+        previousHighlightSha: previousSha,
+        progress,
+        viewportOffsetY: interpolateViewportOffsetY(
+          calculateViewportOffsetY(graph.totalHeight, config.height, previousY),
+          calculateViewportOffsetY(graph.totalHeight, config.height, currentY),
+          progress,
         ),
       };
 
@@ -94,6 +99,7 @@ function run(workerData: RenderWorkerData): void {
       visibleNodeShas: visibleNodes,
       visibleEdges,
       highlightSha: null,
+      previousHighlightSha: animOrder.at(-1) ?? null,
       progress: 1,
       viewportOffsetY: calculateViewportOffsetY(
         graph.totalHeight,

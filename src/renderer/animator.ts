@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fork, type ForkOptions } from 'node:child_process';
 import { type CommitEdge, type CommitGraph } from '../graph/types';
-import { calculateViewportOffsetY } from './camera';
+import { calculateViewportOffsetY, interpolateViewportOffsetY } from './camera';
 import { FrameRenderer } from './frameRenderer';
 import { type AnimationFrame, type RenderConfig } from './types';
 import { type ActivatedEdge, type RenderWorkerData, type RenderWorkerMessage } from './workerTypes';
@@ -57,6 +57,7 @@ export class Animator {
 
     for (let commitIndex = 0; commitIndex < animOrder.length; commitIndex += 1) {
       const sha = animOrder[commitIndex];
+      const previousSha = commitIndex > 0 ? animOrder[commitIndex - 1] : null;
       visibleNodes.add(sha);
 
       while (edgeIndex < activatedEdges.length && activatedEdges[edgeIndex].activationIndex <= commitIndex) {
@@ -65,13 +66,15 @@ export class Animator {
       }
 
       for (let step = 0; step < this.config.framesPerCommit; step += 1) {
+        const progress = (step + 1) / this.config.framesPerCommit;
         const frame: AnimationFrame = {
           frameIndex,
           visibleNodeShas: visibleNodes,
           visibleEdges,
           highlightSha: sha,
-          progress: (step + 1) / this.config.framesPerCommit,
-          viewportOffsetY: this.calculateViewportOffset(sha),
+          previousHighlightSha: previousSha,
+          progress,
+          viewportOffsetY: this.calculateViewportOffset(previousSha, sha, progress),
         };
 
         this.writeFrame(outputDir, frameIndex, frame);
@@ -85,8 +88,13 @@ export class Animator {
       visibleNodeShas: visibleNodes,
       visibleEdges,
       highlightSha: null,
+      previousHighlightSha: animOrder.at(-1) ?? null,
       progress: 1,
-      viewportOffsetY: this.calculateViewportOffset(animOrder.at(-1) ?? null),
+      viewportOffsetY: this.calculateViewportOffset(
+        animOrder.at(-1) ?? null,
+        animOrder.at(-1) ?? null,
+        1,
+      ),
     };
 
     for (let holdIndex = 0; holdIndex < this.config.fps; holdIndex += 1) {
@@ -247,16 +255,33 @@ export class Animator {
     fs.writeFileSync(filename, buffer);
   }
 
-  private calculateViewportOffset(sha: string | null): number {
-    if (!sha) {
+  private calculateViewportOffset(
+    fromSha: string | null,
+    toSha: string | null,
+    progress: number,
+  ): number {
+    if (!fromSha && !toSha) {
       return 0;
     }
 
-    const node = this.graph.nodes.get(sha);
-    if (!node) {
+    const fromNode = fromSha ? this.graph.nodes.get(fromSha) : null;
+    const toNode = toSha ? this.graph.nodes.get(toSha) : null;
+    const fallbackNode = toNode ?? fromNode;
+    if (!fallbackNode) {
       return 0;
     }
 
-    return calculateViewportOffsetY(this.graph.totalHeight, this.config.height, node.y);
+    const fromOffset = calculateViewportOffsetY(
+      this.graph.totalHeight,
+      this.config.height,
+      (fromNode ?? fallbackNode).y,
+    );
+    const toOffset = calculateViewportOffsetY(
+      this.graph.totalHeight,
+      this.config.height,
+      (toNode ?? fallbackNode).y,
+    );
+
+    return interpolateViewportOffsetY(fromOffset, toOffset, progress);
   }
 }

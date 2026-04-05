@@ -32,6 +32,7 @@ export interface AnimationFrame {
   visibleNodeShas: Set<string>;
   visibleEdges: CommitEdge[];
   highlightSha: string | null;
+  previousHighlightSha: string | null;
   progress: number;
   viewportOffsetY: number;
 }

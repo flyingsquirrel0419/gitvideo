@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { calculateViewportOffsetY, VERTICAL_VIEWPORT_MARGIN } from '../../src/renderer/camera';
+import {
+  calculateViewportOffsetY,
+  interpolateViewportOffsetY,
+  VERTICAL_VIEWPORT_MARGIN,
+} from '../../src/renderer/camera';
 
 describe('calculateViewportOffsetY', () => {
   it('does not scroll when the graph already fits in the viewport', () => {
@@ -16,5 +20,20 @@ describe('calculateViewportOffsetY', () => {
     const offset = calculateViewportOffsetY(2000, 400, 1900);
     const availableHeight = 400 - VERTICAL_VIEWPORT_MARGIN * 2;
     expect(offset).toBe(2000 - availableHeight);
+  });
+});
+
+describe('interpolateViewportOffsetY', () => {
+  it('starts from the first viewport offset', () => {
+    expect(interpolateViewportOffsetY(100, 400, 0)).toBe(100);
+  });
+
+  it('ends at the target viewport offset', () => {
+    expect(interpolateViewportOffsetY(100, 400, 1)).toBe(400);
+  });
+
+  it('eases between the two offsets', () => {
+    const midpoint = interpolateViewportOffsetY(100, 400, 0.5);
+    expect(midpoint).toBe(250);
   });
 });

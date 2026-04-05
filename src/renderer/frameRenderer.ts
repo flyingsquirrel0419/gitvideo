@@ -10,6 +10,7 @@ interface Point {
 
 export class FrameRenderer {
   private static readonly VIEWPORT_MARGIN = 20;
+  private static readonly GRID_SPACING = 48;
   private readonly canvas: Canvas;
   private readonly ctx: CanvasRenderingContext2D;
   private currentViewportOffsetY = 0;
@@ -23,12 +24,8 @@ export class FrameRenderer {
   }
 
   renderFrame(frame: AnimationFrame): Buffer {
-    const { ctx } = this;
     this.currentViewportOffsetY = frame.viewportOffsetY;
-    ctx.save();
-    ctx.fillStyle = this.config.theme.background;
-    ctx.fillRect(0, 0, this.config.width, this.config.height);
-    ctx.restore();
+    this.drawBackground(frame);
 
     for (const edge of frame.visibleEdges) {
       this.drawEdge(edge, frame.highlightSha);
@@ -60,14 +57,19 @@ export class FrameRenderer {
     const scale = this.getHorizontalScale();
     const from = this.transformPoint(edge.fromX, edge.fromY);
     const to = this.transformPoint(edge.toX, edge.toY);
+    const isHighlight = highlightSha === edge.fromSha;
 
     ctx.save();
     ctx.beginPath();
     ctx.strokeStyle = edge.laneColor;
-    ctx.lineWidth = Math.max(this.config.theme.edgeWidth * scale, 1);
+    ctx.lineWidth = Math.max(this.config.theme.edgeWidth * scale * (isHighlight ? 1.4 : 1), 1);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    ctx.globalAlpha = highlightSha === edge.fromSha ? 1 : 0.6;
+    ctx.globalAlpha = isHighlight ? 0.95 : 0.45;
+    if (isHighlight) {
+      ctx.shadowColor = this.applyAlpha(edge.laneColor, 0.8);
+      ctx.shadowBlur = 18 * scale;
+    }
 
     if (from.x === to.x) {
       ctx.moveTo(from.x, from.y);
@@ -86,15 +88,16 @@ export class FrameRenderer {
     const { ctx } = this;
     const theme = this.config.theme;
     const scale = this.getHorizontalScale();
+    const easedProgress = this.easeOutCubic(progress);
     const { x, y } = this.transformPoint(node.x, node.y);
     const laneColor = theme.nodeColors[node.laneIndex % theme.nodeColors.length];
     const color = node.isMerge ? theme.mergeNodeColor : laneColor;
-    const radius = Math.max(theme.nodeRadius * progress * scale, 1);
+    const radius = Math.max(theme.nodeRadius * easedProgress * scale, 1);
 
     ctx.save();
-    if (isHighlight && progress > 0.5) {
+    if (isHighlight && progress > 0.35) {
       ctx.shadowColor = color;
-      ctx.shadowBlur = 15 * scale;
+      ctx.shadowBlur = 24 * scale;
     }
 
     ctx.beginPath();
@@ -106,15 +109,20 @@ export class FrameRenderer {
     ctx.stroke();
     ctx.restore();
 
-    if (progress <= 0.7) {
+    if (isHighlight) {
+      this.drawNodePulse(x, y, radius, color, easedProgress);
+    }
+
+    if (progress <= 0.35) {
       return;
     }
 
-    const alpha = (progress - 0.7) / 0.3;
+    const alpha = this.easeOutCubic((progress - 0.35) / 0.65);
     const message = node.message.length > 45 ? `${node.message.slice(0, 45)}...` : node.message;
     const shaFontSize = this.getScaledFontSize(theme.shaFontSize, 8);
     const labelFontSize = this.getScaledFontSize(theme.labelFontSize, 9);
     const gap = Math.max(6 * scale, 4);
+    const lift = (1 - alpha) * 10;
 
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -135,10 +143,13 @@ export class FrameRenderer {
     const fittedMessage = this.fitTextToWidth(message, availableWidth, `${labelFontSize}px ${theme.fontFamily}`);
 
     if (drawRight) {
+      const cardX = preferredLeft - 10;
+      const cardWidth = Math.max(shaWidth + gap + this.measureTextWidth(fittedMessage, `${labelFontSize}px ${theme.fontFamily}`) + 18, 56);
+      this.drawTextSurface(cardX, textY - 17 - lift, cardWidth, 30);
       ctx.font = `${shaFontSize}px ${theme.fontFamily}`;
-      ctx.fillText(node.shortSha, preferredLeft, textY);
+      ctx.fillText(node.shortSha, preferredLeft, textY - lift);
       ctx.font = `${labelFontSize}px ${theme.fontFamily}`;
-      ctx.fillText(fittedMessage, preferredLeft + shaWidth + gap, textY);
+      ctx.fillText(fittedMessage, preferredLeft + shaWidth + gap, textY - lift);
       ctx.restore();
       return;
     }
@@ -146,11 +157,13 @@ export class FrameRenderer {
     ctx.font = `${labelFontSize}px ${theme.fontFamily}`;
     const fittedMessageWidth = ctx.measureText(fittedMessage).width;
     const rightEdge = Math.max(leftAnchor, FrameRenderer.VIEWPORT_MARGIN + shaWidth + gap + fittedMessageWidth);
+    const leftCardX = Math.max(rightEdge - (shaWidth + gap + fittedMessageWidth + 18), FrameRenderer.VIEWPORT_MARGIN);
+    this.drawTextSurface(leftCardX, textY - 17 - lift, rightEdge - leftCardX + 10, 30);
     ctx.font = `${labelFontSize}px ${theme.fontFamily}`;
     ctx.textAlign = 'right';
-    ctx.fillText(fittedMessage, rightEdge, textY);
+    ctx.fillText(fittedMessage, rightEdge, textY - lift);
     ctx.font = `${shaFontSize}px ${theme.fontFamily}`;
-    ctx.fillText(node.shortSha, Math.max(rightEdge - fittedMessageWidth - gap, FrameRenderer.VIEWPORT_MARGIN + shaWidth), textY);
+    ctx.fillText(node.shortSha, Math.max(rightEdge - fittedMessageWidth - gap, FrameRenderer.VIEWPORT_MARGIN + shaWidth), textY - lift);
     ctx.restore();
   }
 
@@ -206,6 +219,104 @@ export class FrameRenderer {
     ctx.fill();
   }
 
+  private drawBackground(frame: AnimationFrame): void {
+    const { ctx } = this;
+    const { width, height, theme } = this.config;
+    const gradient = ctx.createLinearGradient(0, 0, width, height);
+    gradient.addColorStop(0, theme.background);
+    gradient.addColorStop(1, theme.backgroundAccent);
+    ctx.save();
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+
+    const glow = ctx.createRadialGradient(
+      width * 0.75,
+      height * 0.2,
+      0,
+      width * 0.75,
+      height * 0.2,
+      width * 0.8,
+    );
+    glow.addColorStop(0, this.applyAlpha(theme.backgroundGlow, 0.18));
+    glow.addColorStop(1, this.applyAlpha(theme.backgroundGlow, 0));
+    ctx.save();
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+
+    const gridOffsetY = -(this.currentViewportOffsetY * 0.18 % FrameRenderer.GRID_SPACING);
+    ctx.save();
+    ctx.strokeStyle = this.applyAlpha(theme.gridColor, 0.08);
+    ctx.lineWidth = 1;
+    for (let y = gridOffsetY; y < height; y += FrameRenderer.GRID_SPACING) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
+    }
+    for (let x = 0; x < width; x += FrameRenderer.GRID_SPACING) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    if (frame.highlightSha) {
+      const node = this.graph.nodes.get(frame.highlightSha);
+      if (node) {
+        const point = this.transformPoint(node.x, node.y);
+        const spot = ctx.createRadialGradient(point.x, point.y, 0, point.x, point.y, width * 0.32);
+        spot.addColorStop(0, this.applyAlpha(theme.glowColor, 0.14));
+        spot.addColorStop(1, this.applyAlpha(theme.glowColor, 0));
+        ctx.save();
+        ctx.fillStyle = spot;
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+      }
+    }
+
+    const vignette = ctx.createRadialGradient(
+      width / 2,
+      height / 2,
+      Math.min(width, height) * 0.35,
+      width / 2,
+      height / 2,
+      Math.max(width, height) * 0.75,
+    );
+    vignette.addColorStop(0, 'rgba(0,0,0,0)');
+    vignette.addColorStop(1, 'rgba(0,0,0,0.28)');
+    ctx.save();
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+  }
+
+  private drawNodePulse(x: number, y: number, radius: number, color: string, progress: number): void {
+    const { ctx } = this;
+    const pulseRadius = radius + 10 + (1 - progress) * 12;
+    ctx.save();
+    ctx.globalAlpha = 0.18 * progress;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y, pulseRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private drawTextSurface(x: number, y: number, width: number, height: number): void {
+    const { ctx } = this;
+    ctx.save();
+    ctx.fillStyle = this.config.theme.surfaceColor;
+    this.fillRoundedRect(x, y, width, height, 10);
+    ctx.strokeStyle = this.applyAlpha(this.config.theme.surfaceBorder, 0.7);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+
   private transformPoint(x: number, y: number): Point {
     const scale = this.getHorizontalScale();
     const offsetX = Math.max((this.config.width - this.graph.totalWidth * scale) / 2, 0);
@@ -220,6 +331,15 @@ export class FrameRenderer {
 
   private getScaledFontSize(size: number, minimum: number): number {
     return Math.max(Math.round(size * this.getHorizontalScale()), minimum);
+  }
+
+  private measureTextWidth(text: string, font: string): number {
+    const { ctx } = this;
+    ctx.save();
+    ctx.font = font;
+    const width = ctx.measureText(text).width;
+    ctx.restore();
+    return width;
   }
 
   private fitTextToWidth(text: string, maxWidth: number, font: string): string {
@@ -259,5 +379,25 @@ export class FrameRenderer {
 
   private clamp(value: number, minimum: number, maximum: number): number {
     return Math.min(Math.max(value, minimum), maximum);
+  }
+
+  private easeOutCubic(value: number): number {
+    const clamped = this.clamp(value, 0, 1);
+    return 1 - (1 - clamped) ** 3;
+  }
+
+  private applyAlpha(color: string, alpha: number): string {
+    if (!color.startsWith('#')) {
+      return color;
+    }
+
+    const hex = color.slice(1);
+    const normalized = hex.length === 3
+      ? hex.split('').map((char) => char + char).join('')
+      : hex;
+    const red = Number.parseInt(normalized.slice(0, 2), 16);
+    const green = Number.parseInt(normalized.slice(2, 4), 16);
+    const blue = Number.parseInt(normalized.slice(4, 6), 16);
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
   }
 }

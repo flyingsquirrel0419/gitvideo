@@ -37,6 +37,8 @@ export class FFmpegEncoder {
     args.push(
       '-c:v',
       'libx264',
+      '-tune',
+      'animation',
       '-preset',
       'slow',
       '-crf',

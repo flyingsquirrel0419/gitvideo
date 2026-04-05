@@ -2,6 +2,12 @@ import { type CommitEdge } from '../graph/types';
 
 export interface Theme {
   background: string;
+  backgroundAccent: string;
+  backgroundGlow: string;
+  gridColor: string;
+  surfaceColor: string;
+  surfaceBorder: string;
+  glowColor: string;
   nodeColors: string[];
   nodeRadius: number;
   edgeWidth: number;

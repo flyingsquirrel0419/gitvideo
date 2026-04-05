@@ -2,6 +2,12 @@ import { type Theme } from './types';
 
 export const DARK_THEME: Theme = {
   background: '#0d1117',
+  backgroundAccent: '#111827',
+  backgroundGlow: '#1d4ed8',
+  gridColor: '#93c5fd',
+  surfaceColor: '#0f172acc',
+  surfaceBorder: '#334155',
+  glowColor: '#60a5fa',
   nodeColors: [
     '#58a6ff',
     '#3fb950',
@@ -23,6 +29,12 @@ export const DARK_THEME: Theme = {
 
 export const LIGHT_THEME: Theme = {
   background: '#ffffff',
+  backgroundAccent: '#e0f2fe',
+  backgroundGlow: '#38bdf8',
+  gridColor: '#0f172a',
+  surfaceColor: '#ffffffd9',
+  surfaceBorder: '#cbd5e1',
+  glowColor: '#0284c7',
   nodeColors: ['#0969da', '#1a7f37', '#cf222e', '#8250df', '#d1242f', '#0550ae'],
   nodeRadius: 8,
   edgeWidth: 2,

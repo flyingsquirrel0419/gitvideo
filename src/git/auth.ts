@@ -1,4 +1,7 @@
 import { execFile, spawn } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
 function execFileText(command: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -21,6 +24,32 @@ async function isGhInstalled(): Promise<boolean> {
   }
 }
 
+export function parseGhStatusToken(output: string): string | undefined {
+  for (const line of output.split('\n')) {
+    const match = line.match(/Token:\s+(\S+)/);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return undefined;
+}
+
+function readTokenFromGhHostsFile(): string | undefined {
+  try {
+    const hostsPath = path.join(os.homedir(), '.config', 'gh', 'hosts.yml');
+    if (!fs.existsSync(hostsPath)) {
+      return undefined;
+    }
+
+    const content = fs.readFileSync(hostsPath, 'utf8');
+    const match = content.match(/oauth_token:\s+(\S+)/);
+    return match?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
 export async function resolveGitHubToken(explicitToken?: string): Promise<string> {
   if (explicitToken) {
     return explicitToken;
@@ -38,7 +67,15 @@ export async function resolveGitHubToken(explicitToken?: string): Promise<string
   }
 
   try {
-    const token = await execFileText('gh', ['auth', 'token']);
+    let token: string | undefined;
+
+    try {
+      token = await execFileText('gh', ['auth', 'token']);
+    } catch {
+      const statusOutput = await execFileText('gh', ['auth', 'status', '--show-token']);
+      token = parseGhStatusToken(statusOutput) ?? readTokenFromGhHostsFile();
+    }
+
     if (!token) {
       throw new Error('empty token');
     }

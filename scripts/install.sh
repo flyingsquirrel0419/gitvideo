@@ -100,22 +100,20 @@ log "Building project"
 npm run build
 
 NPM_PREFIX="$(npm config get prefix)"
-GLOBAL_BIN_DIR="$NPM_PREFIX/bin"
-if [[ ! -d "$GLOBAL_BIN_DIR" || ! -w "$GLOBAL_BIN_DIR" ]]; then
+TARGET_NODE_MODULES="$NPM_PREFIX/lib/node_modules"
+if [[ ! -d "$TARGET_NODE_MODULES" || ! -w "$TARGET_NODE_MODULES" ]]; then
   export npm_config_prefix="$HOME/.local"
-  mkdir -p "$HOME/.local/bin"
+  mkdir -p "$HOME/.local"
   log "Using user npm prefix at $HOME/.local"
 fi
 
-GLOBAL_BIN_DIR="$(npm prefix -g)/bin"
-mkdir -p "$GLOBAL_BIN_DIR"
-APP_BIN="$APP_DIR/dist/index.js"
-chmod +x "$APP_BIN"
-ln -sfn "$APP_BIN" "$GLOBAL_BIN_DIR/gitvideo"
+log "Running npm link"
+npm link
 
 printf '%s\n' "$REPO_SLUG" > "$INSTALL_ROOT/repo"
 printf '%s\n' "$TAG" > "$INSTALL_ROOT/version"
 
+GLOBAL_BIN_DIR="$(npm prefix -g)/bin"
 case ":$PATH:" in
   *":$GLOBAL_BIN_DIR:"*) ;;
   *)

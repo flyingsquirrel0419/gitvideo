@@ -1,6 +1,6 @@
 {
   "name": "gitvideo",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "Git commit history to video generator",
   "main": "dist/index.js",
   "homepage": "https://github.com/flyingsquirrel0419/gitvideo#readme",

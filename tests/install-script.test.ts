@@ -5,10 +5,9 @@ import { describe, expect, it } from 'vitest';
 const installScript = fs.readFileSync(path.resolve('scripts/install.sh'), 'utf8');
 
 describe('install.sh', () => {
-  it('installs gitvideo as one direct executable symlink instead of npm link', () => {
-    expect(installScript).not.toContain('npm link');
-    expect(installScript).not.toContain('CURRENT_LINK=');
-    expect(installScript).toContain('APP_BIN="$APP_DIR/dist/index.js"');
-    expect(installScript).toContain('ln -sfn "$APP_BIN" "$GLOBAL_BIN_DIR/gitvideo"');
+  it('installs gitvideo through npm link', () => {
+    expect(installScript).toContain('log "Running npm link"');
+    expect(installScript).toContain('npm link');
+    expect(installScript).not.toContain('APP_BIN="$APP_DIR/dist/index.js"');
   });
 });

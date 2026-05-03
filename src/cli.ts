@@ -42,6 +42,8 @@ function stageText(label: string, percent: number, detail?: string): string {
 export interface CliDependencies {
   runTui?: () => Promise<void>;
   generateVideo?: (options: CliGenerateOptions) => Promise<void>;
+  githubLogin?: () => Promise<void>;
+  githubStatus?: () => Promise<void>;
 }
 
 export async function generateVideo(options: CliGenerateOptions): Promise<void> {
@@ -125,14 +127,20 @@ export async function generateVideo(options: CliGenerateOptions): Promise<void> 
 export function buildCLI(dependencies: CliDependencies = {}): Command {
   const program = new Command();
   const runTui = dependencies.runTui
-    ?? (() => runDefaultTui({ generate: dependencies.generateVideo ?? generateVideo }));
+    ?? (() => runDefaultTui({
+      generate: dependencies.generateVideo ?? generateVideo,
+      login: dependencies.githubLogin ?? runGitHubLogin,
+      status: dependencies.githubStatus ?? runGitHubStatus,
+    }));
   const runGenerate = dependencies.generateVideo ?? generateVideo;
+  const runLogin = dependencies.githubLogin ?? runGitHubLogin;
+  const runStatus = dependencies.githubStatus ?? runGitHubStatus;
 
   program
     .name('gitvideo')
     .description('Turn Git commit history into an animated video')
-    .version('1.0.15')
-    .addHelpText('after', '\nRun without arguments to open the interactive TUI.\n')
+    .version('1.0.16')
+    .addHelpText('after', '\nRun without arguments to open the interactive arrow-key TUI.\n')
     .action(async () => {
       await runTui();
     });
@@ -143,14 +151,14 @@ export function buildCLI(dependencies: CliDependencies = {}): Command {
     .command('login')
     .description('Start GitHub CLI login')
     .action(async () => {
-      await runGitHubLogin();
+      await runLogin();
     });
 
   authCommand
     .command('status')
     .description('Show GitHub CLI auth status')
     .action(async () => {
-      await runGitHubStatus();
+      await runStatus();
     });
 
   program

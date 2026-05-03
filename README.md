@@ -1,6 +1,6 @@
 # gitvideo
 
-`gitvideo` is a TypeScript terminal app that turns Git commit history into an animated MP4 timeline. Run `gitvideo` anywhere and answer the prompts; command flags remain available for automation.
+`gitvideo` is a TypeScript terminal app that turns Git commit history into an animated MP4 timeline. Run `gitvideo` anywhere to open the arrow-key TUI; command flags remain available for automation.
 
 ## Requirements
 
@@ -49,23 +49,23 @@ The installer creates one executable symlink named `gitvideo` in your npm global
 
 ## TUI Flow
 
-Running `gitvideo` opens an interactive terminal flow:
+Running `gitvideo` opens a colored terminal app that adapts to the current terminal size. Use arrow keys to move, Enter to select, and `q` to quit.
 
 ```text
-gitvideo TUI
-Press Enter to accept defaults.
-
-Repository source (local/github) [local]:
-Local repository path [.]:
-Output directory [current directory]:
-Theme (dark/light) [dark]:
-Frames per commit speed [15]:
-Maximum commits [all]:
-Render workers [1]:
-Keep rendered frames? (y/N):
+┌────────────────────────────────────────────┐
+│ gitvideo interactive console               │
+│ Use arrows to move, Enter to select, q...  │
+├────────────────────────────────────────────┤
+│ › 1  Quick render current directory        │
+│   2  Configure local repository            │
+│   3  Configure GitHub repository           │
+│   4  GitHub login                          │
+│   5  GitHub auth status                    │
+│   q  Exit                                  │
+└────────────────────────────────────────────┘
 ```
 
-Use `local` for a repository on disk, or `github` for `owner/repo`. For GitHub repositories, run `gitvideo auth login` once first, or pass a token through `GITHUB_TOKEN` when using command mode.
+Quick render uses the current directory and default settings. Configure local or GitHub mode when you want to set the repo path, output directory, theme, speed, commit limit, and render workers. For GitHub repositories, run `GitHub login` from the TUI once first, or pass a token through `GITHUB_TOKEN` when using command mode.
 
 ## Command Mode
 
@@ -108,7 +108,7 @@ gitvideo generate \
 
 ## Options
 
-- `gitvideo`: open the interactive TUI
+- `gitvideo`: open the interactive arrow-key TUI
 - `auth login`: open GitHub CLI web login
 - `auth status`: print current GitHub CLI auth status
 - `--config <file>`: optional JSON config file, defaults to `gitvideo.config.json`

@@ -1,6 +1,63 @@
 import { describe, expect, it, vi } from 'vitest';
 import { type CliGenerateOptions } from '../src/config';
-import { promptForGenerateOptions, runTui } from '../src/tui';
+import {
+  handleMenuKey,
+  mainMenuItems,
+  promptForGenerateOptions,
+  renderAppFrame,
+  runTui,
+} from '../src/tui';
+
+const ansiPattern = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
+
+describe('renderAppFrame', () => {
+  it('renders a colored app-like frame that fits the terminal width', () => {
+    const frame = renderAppFrame({
+      selectedIndex: 0,
+      columns: 42,
+      rows: 12,
+    });
+
+    expect(frame).toContain('\x1b[');
+    expect(frame).toContain('gitvideo');
+    expect(frame).toContain('Quick render');
+    for (const line of frame.split('\n')) {
+      expect(line.replace(ansiPattern, '').length).toBeLessThanOrEqual(42);
+    }
+  });
+
+  it('uses a compact layout for short terminals', () => {
+    const frame = renderAppFrame({
+      selectedIndex: 1,
+      columns: 32,
+      rows: 7,
+    });
+
+    expect(frame).toContain('2/6');
+    expect(frame).toContain('Use arrows');
+    for (const line of frame.split('\n')) {
+      expect(line.replace(ansiPattern, '').length).toBeLessThanOrEqual(32);
+    }
+  });
+});
+
+describe('handleMenuKey', () => {
+  it('moves selection with arrow keys and wraps around', () => {
+    expect(handleMenuKey(0, { name: 'down' }, mainMenuItems.length).selectedIndex).toBe(1);
+    expect(handleMenuKey(0, { name: 'up' }, mainMenuItems.length).selectedIndex).toBe(mainMenuItems.length - 1);
+  });
+
+  it('selects with enter and exits with q', () => {
+    expect(handleMenuKey(2, { name: 'return' }, mainMenuItems.length)).toEqual({
+      selectedIndex: 2,
+      action: 'select',
+    });
+    expect(handleMenuKey(2, { name: 'q' }, mainMenuItems.length)).toEqual({
+      selectedIndex: 2,
+      action: 'exit',
+    });
+  });
+});
 
 describe('promptForGenerateOptions', () => {
   it('collects local repository settings with defaults', async () => {

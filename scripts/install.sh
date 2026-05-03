@@ -88,7 +88,6 @@ SOURCE_DIR="$(find "$TMP_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
 [[ -n "$SOURCE_DIR" ]] || fail "Failed to unpack release archive."
 
 APP_DIR="$INSTALL_ROOT/$TAG"
-CURRENT_LINK="$INSTALL_ROOT/current"
 mkdir -p "$INSTALL_ROOT"
 rm -rf "$APP_DIR"
 cp -R "$SOURCE_DIR" "$APP_DIR"
@@ -101,21 +100,22 @@ log "Building project"
 npm run build
 
 NPM_PREFIX="$(npm config get prefix)"
-TARGET_NODE_MODULES="$NPM_PREFIX/lib/node_modules"
-if [[ ! -d "$TARGET_NODE_MODULES" || ! -w "$TARGET_NODE_MODULES" ]]; then
+GLOBAL_BIN_DIR="$NPM_PREFIX/bin"
+if [[ ! -d "$GLOBAL_BIN_DIR" || ! -w "$GLOBAL_BIN_DIR" ]]; then
   export npm_config_prefix="$HOME/.local"
-  mkdir -p "$HOME/.local"
+  mkdir -p "$HOME/.local/bin"
   log "Using user npm prefix at $HOME/.local"
 fi
 
-log "Running npm link"
-npm link
+GLOBAL_BIN_DIR="$(npm prefix -g)/bin"
+mkdir -p "$GLOBAL_BIN_DIR"
+APP_BIN="$APP_DIR/dist/index.js"
+chmod +x "$APP_BIN"
+ln -sfn "$APP_BIN" "$GLOBAL_BIN_DIR/gitvideo"
 
-ln -sfn "$APP_DIR" "$CURRENT_LINK"
 printf '%s\n' "$REPO_SLUG" > "$INSTALL_ROOT/repo"
 printf '%s\n' "$TAG" > "$INSTALL_ROOT/version"
 
-GLOBAL_BIN_DIR="$(npm prefix -g)/bin"
 case ":$PATH:" in
   *":$GLOBAL_BIN_DIR:"*) ;;
   *)
@@ -129,4 +129,4 @@ else
   log "Optional: install GitHub CLI with 'brew install gh' to use 'gitvideo auth login'"
 fi
 
-log "Installed successfully. Run: gitvideo --help"
+log "Installed successfully. Run: gitvideo"

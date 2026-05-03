@@ -11,6 +11,7 @@ import { GitParser } from './git/parser';
 import { DAGBuilder } from './graph/dag';
 import { LayoutCalculator } from './graph/layout';
 import { Animator } from './renderer/animator';
+import { runTui as runDefaultTui } from './tui';
 import { createTempDir, removeDir } from './utils/fileUtils';
 
 function collectValues(value: string, previous: string[]): string[] {
@@ -38,13 +39,103 @@ function stageText(label: string, percent: number, detail?: string): string {
     : `${label}... ${formatPercent(percent)} overall`;
 }
 
-export function buildCLI(): Command {
+export interface CliDependencies {
+  runTui?: () => Promise<void>;
+  generateVideo?: (options: CliGenerateOptions) => Promise<void>;
+}
+
+export async function generateVideo(options: CliGenerateOptions): Promise<void> {
+  const spinner = ora();
+  let framesDir: string | null = null;
+
+  try {
+    const config = resolveAppConfig(options);
+    const encoder = new FFmpegEncoder();
+
+    if (!(await encoder.checkInstalled())) {
+      throw new Error('FFmpeg is not installed. Install it first to encode mp4 output.');
+    }
+
+    spinner.start(stageText('Collecting commit history', 5));
+    const rawCommits = await collectCommits(config);
+    if (rawCommits.length === 0) {
+      throw new Error('No commits found for the selected repository and filters.');
+    }
+    spinner.succeed(stageText('Collected commits', 20, `${rawCommits.length} commits`));
+
+    spinner.start(stageText('Building graph', 25));
+    const dagBuilder = new DAGBuilder();
+    let graph = dagBuilder.build(rawCommits);
+    spinner.succeed(stageText('Graph built', 40));
+
+    spinner.start(stageText('Calculating layout', 45));
+    graph = new LayoutCalculator().calculate(graph, config.render.theme);
+    spinner.succeed(stageText('Layout ready', 55));
+
+    framesDir = createTempDir('gitvideo');
+    spinner.start(stageText('Rendering frames', 55));
+    const animator = new Animator(graph, config.render);
+    await animator.generateFrames(framesDir, (current, total) => {
+      const overallPercent = toPercent(current, total, 55, 85);
+      const renderPercent = toPercent(current, total, 0, 100);
+      spinner.text = stageText(
+        'Rendering frames',
+        overallPercent,
+        `${formatPercent(renderPercent)} render, ${current}/${total} frames`,
+      );
+    });
+    spinner.succeed(stageText('Frames rendered', 85));
+
+    const totalFrameCount = rawCommits.length * config.render.framesPerCommit + config.render.fps;
+    const expectedDurationSeconds = totalFrameCount / config.render.fps;
+    fs.mkdirSync(path.dirname(config.outputPath), { recursive: true });
+
+    spinner.start(stageText('Encoding video', 85));
+    await encoder.encode({
+      framesDir,
+      outputPath: config.outputPath,
+      fps: config.render.fps,
+      audioPath: config.audioPath,
+      expectedDurationSeconds,
+      onProgress: (progress) => {
+        spinner.text = stageText(
+          'Encoding video',
+          mapProgress(progress, 85, 100),
+          `${formatPercent(mapProgress(progress, 0, 100))} encode`,
+        );
+      },
+    });
+    spinner.succeed(`Video created: ${chalk.green(config.outputPath)} (${formatPercent(100)})`);
+
+    if (config.keepFrames) {
+      console.log(chalk.yellow(`Frames kept at ${framesDir}`));
+      framesDir = null;
+    }
+  } catch (error) {
+    spinner.fail('Command failed');
+    console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+    process.exitCode = 1;
+  } finally {
+    if (framesDir && fs.existsSync(framesDir)) {
+      removeDir(framesDir);
+    }
+  }
+}
+
+export function buildCLI(dependencies: CliDependencies = {}): Command {
   const program = new Command();
+  const runTui = dependencies.runTui
+    ?? (() => runDefaultTui({ generate: dependencies.generateVideo ?? generateVideo }));
+  const runGenerate = dependencies.generateVideo ?? generateVideo;
 
   program
     .name('gitvideo')
     .description('Turn Git commit history into an animated video')
-    .version('1.0.0');
+    .version('1.0.14')
+    .addHelpText('after', '\nRun without arguments to open the interactive TUI.\n')
+    .action(async () => {
+      await runTui();
+    });
 
   const authCommand = program.command('auth').description('Manage GitHub authentication');
 
@@ -82,81 +173,7 @@ export function buildCLI(): Command {
     .option('--exclude-branch <pattern>', 'Branch glob pattern to exclude', collectValues, [])
     .option('--keep-frames', 'Keep intermediate PNG frames')
     .action(async (options: CliGenerateOptions) => {
-      const spinner = ora();
-      let framesDir: string | null = null;
-
-      try {
-        const config = resolveAppConfig(options);
-        const encoder = new FFmpegEncoder();
-
-        if (!(await encoder.checkInstalled())) {
-          throw new Error('FFmpeg is not installed. Install it first to encode mp4 output.');
-        }
-
-        spinner.start(stageText('Collecting commit history', 5));
-        const rawCommits = await collectCommits(config);
-        if (rawCommits.length === 0) {
-          throw new Error('No commits found for the selected repository and filters.');
-        }
-        spinner.succeed(stageText('Collected commits', 20, `${rawCommits.length} commits`));
-
-        spinner.start(stageText('Building graph', 25));
-        const dagBuilder = new DAGBuilder();
-        let graph = dagBuilder.build(rawCommits);
-        spinner.succeed(stageText('Graph built', 40));
-
-        spinner.start(stageText('Calculating layout', 45));
-        graph = new LayoutCalculator().calculate(graph, config.render.theme);
-        spinner.succeed(stageText('Layout ready', 55));
-
-        framesDir = createTempDir('gitvideo');
-        spinner.start(stageText('Rendering frames', 55));
-        const animator = new Animator(graph, config.render);
-        await animator.generateFrames(framesDir, (current, total) => {
-          const overallPercent = toPercent(current, total, 55, 85);
-          const renderPercent = toPercent(current, total, 0, 100);
-          spinner.text = stageText(
-            'Rendering frames',
-            overallPercent,
-            `${formatPercent(renderPercent)} render, ${current}/${total} frames`,
-          );
-        });
-        spinner.succeed(stageText('Frames rendered', 85));
-
-        const totalFrameCount = rawCommits.length * config.render.framesPerCommit + config.render.fps;
-        const expectedDurationSeconds = totalFrameCount / config.render.fps;
-        fs.mkdirSync(path.dirname(config.outputPath), { recursive: true });
-
-        spinner.start(stageText('Encoding video', 85));
-        await encoder.encode({
-          framesDir,
-          outputPath: config.outputPath,
-          fps: config.render.fps,
-          audioPath: config.audioPath,
-          expectedDurationSeconds,
-          onProgress: (progress) => {
-            spinner.text = stageText(
-              'Encoding video',
-              mapProgress(progress, 85, 100),
-              `${formatPercent(mapProgress(progress, 0, 100))} encode`,
-            );
-          },
-        });
-        spinner.succeed(`Video created: ${chalk.green(config.outputPath)} (${formatPercent(100)})`);
-
-        if (config.keepFrames) {
-          console.log(chalk.yellow(`Frames kept at ${framesDir}`));
-          framesDir = null;
-        }
-      } catch (error) {
-        spinner.fail('Command failed');
-        console.error(chalk.red(error instanceof Error ? error.message : String(error)));
-        process.exitCode = 1;
-      } finally {
-        if (framesDir && fs.existsSync(framesDir)) {
-          removeDir(framesDir);
-        }
-      }
+      await runGenerate(options);
     });
 
   return program;

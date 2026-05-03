@@ -1,6 +1,6 @@
 # gitvideo
 
-`gitvideo` is a TypeScript CLI that turns Git commit history into an animated MP4 timeline. It supports local repositories through `git log` and remote GitHub repositories through the GitHub API.
+`gitvideo` is a TypeScript terminal app that turns Git commit history into an animated MP4 timeline. Run `gitvideo` anywhere and answer the prompts; command flags remain available for automation.
 
 ## Requirements
 
@@ -42,11 +42,34 @@ curl -fsSL https://raw.githubusercontent.com/flyingsquirrel0419/gitvideo/main/sc
 ## First Run
 
 ```bash
-gitvideo auth login
-gitvideo --help
+gitvideo
 ```
 
-## Common Usage
+The installer creates one executable symlink named `gitvideo` in your npm global bin directory. If your shell cannot find it, add the directory printed by the installer to `PATH`.
+
+## TUI Flow
+
+Running `gitvideo` opens an interactive terminal flow:
+
+```text
+gitvideo TUI
+Press Enter to accept defaults.
+
+Repository source (local/github) [local]:
+Local repository path [.]:
+Output directory [current directory]:
+Theme (dark/light) [dark]:
+Frames per commit speed [15]:
+Maximum commits [all]:
+Render workers [1]:
+Keep rendered frames? (y/N):
+```
+
+Use `local` for a repository on disk, or `github` for `owner/repo`. For GitHub repositories, run `gitvideo auth login` once first, or pass a token through `GITHUB_TOKEN` when using command mode.
+
+## Command Mode
+
+Command mode is still available for scripts and CI.
 
 ### Generate from a local repository
 
@@ -85,6 +108,7 @@ gitvideo generate \
 
 ## Options
 
+- `gitvideo`: open the interactive TUI
 - `auth login`: open GitHub CLI web login
 - `auth status`: print current GitHub CLI auth status
 - `--config <file>`: optional JSON config file, defaults to `gitvideo.config.json`

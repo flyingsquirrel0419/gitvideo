@@ -11,26 +11,41 @@
 
 ## Quick Start
 
-### macOS prerequisites
+### One-command install
 
 ```bash
-brew install node@22 ffmpeg gh pkg-config cairo pango libpng jpeg giflib librsvg pixman
+curl -fsSL https://raw.githubusercontent.com/flyingsquirrel0419/gitvideo/main/scripts/install.sh | bash
+```
+
+Then run:
+
+```bash
+gitvideo
+```
+
+The installer now defaults to `flyingsquirrel0419/gitvideo`, installs dependencies, builds the app, and registers the `gitvideo` command. Do not run it with `sudo`; if your npm global prefix is not writable, it falls back to `~/.local` and prints the PATH entry to add.
+
+### macOS notes
+
+```bash
+brew install node@22
 export PATH="/opt/homebrew/opt/node@22/bin:$PATH"
 ```
 
-Do not run the installer with `sudo`.
+On macOS, the installer uses Homebrew to install missing FFmpeg, GitHub CLI, and canvas build packages automatically. Homebrew itself still needs to be installed first.
 
-### Install
+### Install another fork or version
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/flyingsquirrel0419/gitvideo/main/scripts/install.sh | bash -s -- flyingsquirrel0419/gitvideo
+GITVIDEO_VERSION=v1.0.16 curl -fsSL https://raw.githubusercontent.com/flyingsquirrel0419/gitvideo/main/scripts/install.sh | bash
 ```
 
 ### Update
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/flyingsquirrel0419/gitvideo/main/scripts/uninstall.sh | bash
-curl -fsSL https://raw.githubusercontent.com/flyingsquirrel0419/gitvideo/main/scripts/install.sh | bash -s -- flyingsquirrel0419/gitvideo
+curl -fsSL https://raw.githubusercontent.com/flyingsquirrel0419/gitvideo/main/scripts/install.sh | bash
 ```
 
 ### Remove
@@ -49,20 +64,23 @@ The installer creates one executable symlink named `gitvideo` in your npm global
 
 ## TUI Flow
 
-Running `gitvideo` opens a colored terminal app that adapts to the current terminal size. Use arrow keys to move, Enter to select, and `q` to quit.
+Running `gitvideo` opens a redesigned terminal studio that adapts to the current terminal size. Use arrow keys to move, Enter to select, number keys for direct actions, and `q` to quit.
 
 ```text
-┌────────────────────────────────────────────┐
-│ gitvideo interactive console               │
-│ Use arrows to move, Enter to select, q...  │
-├────────────────────────────────────────────┤
-│ › 1  Quick render current directory        │
-│   2  Configure local repository            │
-│   3  Configure GitHub repository           │
-│   4  GitHub login                          │
-│   5  GitHub auth status                    │
-│   q  Exit                                  │
-└────────────────────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│ gitvideo studio commit history to motion     │
+│ repo → graph → frames → mp4 ●──────────────● │
+├──────────────────────────────────────────────┤
+│ ACTIONS                                      │
+│ ▶ [1] Quick render current directory   ready │
+│   [2] Configure local repository       setup │
+│   [3] Configure GitHub repository      setup │
+│   [4] GitHub login                    github │
+├──────────────────────────────────────────────┤
+│ SELECTED                                     │
+│ Quick render current directory        ready  │
+│ Use this folder with default video settings. │
+└──────────────────────────────────────────────┘
 ```
 
 Quick render uses the current directory and default settings. Configure local or GitHub mode when you want to set the repo path, output directory, theme, speed, commit limit, and render workers. For GitHub repositories, run `GitHub login` from the TUI once first, or pass a token through `GITHUB_TOKEN` when using command mode.

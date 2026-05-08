@@ -11,7 +11,7 @@ import {
 const ansiPattern = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
 
 describe('renderAppFrame', () => {
-  it('renders a colored app-like frame that fits the terminal width', () => {
+  it('renders a redesigned studio frame that fits the terminal width', () => {
     const frame = renderAppFrame({
       selectedIndex: 0,
       columns: 42,
@@ -20,6 +20,9 @@ describe('renderAppFrame', () => {
 
     expect(frame).toContain('\x1b[');
     expect(frame).toContain('gitvideo');
+    expect(frame).toContain('studio');
+    expect(frame).toContain('ACTIONS');
+    expect(frame).toContain('SELECTED');
     expect(frame).toContain('Quick render');
     for (const line of frame.split('\n')) {
       expect(line.replace(ansiPattern, '').length).toBeLessThanOrEqual(42);
@@ -34,7 +37,7 @@ describe('renderAppFrame', () => {
     });
 
     expect(frame).toContain('2/6');
-    expect(frame).toContain('Use arrows');
+    expect(frame).toContain('Enter run');
     for (const line of frame.split('\n')) {
       expect(line.replace(ansiPattern, '').length).toBeLessThanOrEqual(32);
     }

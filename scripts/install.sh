@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_SLUG="${GITVIDEO_REPO:-${1:-}}"
+DEFAULT_REPO_SLUG="flyingsquirrel0419/gitvideo"
+REPO_SLUG="${GITVIDEO_REPO:-${1:-$DEFAULT_REPO_SLUG}}"
 REQUESTED_TAG="${GITVIDEO_VERSION:-latest}"
 INSTALL_ROOT="${GITVIDEO_INSTALL_ROOT:-$HOME/.gitvideo}"
 
@@ -20,16 +21,20 @@ require_cmd() {
   fi
 }
 
-if [[ -z "$REPO_SLUG" ]]; then
-  fail "Usage: curl .../install.sh | bash -s -- OWNER/REPO"
-fi
+add_brew_package() {
+  local package="$1"
+  case " ${BREW_PACKAGES[*]} " in
+    *" $package "*) ;;
+    *) BREW_PACKAGES+=("$package") ;;
+  esac
+}
 
 require_cmd curl
 require_cmd tar
 require_cmd node
 require_cmd npm
 
-if ! command -v ffmpeg >/dev/null 2>&1; then
+if [[ "$(uname -s)" != "Darwin" ]] && ! command -v ffmpeg >/dev/null 2>&1; then
   log "FFmpeg is not installed. Install it before generating video. On macOS: brew install ffmpeg"
 fi
 
@@ -43,15 +48,35 @@ fi
 
 if [[ "$(uname -s)" == "Darwin" ]]; then
   if ! command -v brew >/dev/null 2>&1; then
-    fail "Homebrew is required on macOS. Install brew first, then run: brew install pkg-config cairo pango libpng jpeg giflib librsvg pixman ffmpeg gh"
+    fail "Homebrew is required on macOS. Install brew first, then rerun this installer."
   fi
 
+  BREW_PACKAGES=()
   if ! command -v pkg-config >/dev/null 2>&1; then
-    fail "pkg-config is missing. Run: brew install pkg-config cairo pango libpng jpeg giflib librsvg pixman"
+    add_brew_package pkg-config
   fi
 
-  if ! pkg-config --exists pixman-1 cairo pangocairo librsvg-2.0; then
-    fail "canvas build dependencies are missing. Run: brew install cairo pango libpng jpeg giflib librsvg pixman"
+  if ! command -v ffmpeg >/dev/null 2>&1; then
+    add_brew_package ffmpeg
+  fi
+
+  if ! command -v gh >/dev/null 2>&1; then
+    add_brew_package gh
+  fi
+
+  if ! command -v pkg-config >/dev/null 2>&1 || ! pkg-config --exists pixman-1 cairo pangocairo librsvg-2.0; then
+    add_brew_package cairo
+    add_brew_package pango
+    add_brew_package libpng
+    add_brew_package jpeg
+    add_brew_package giflib
+    add_brew_package librsvg
+    add_brew_package pixman
+  fi
+
+  if [[ "${#BREW_PACKAGES[@]}" -gt 0 ]]; then
+    log "Installing macOS prerequisites: ${BREW_PACKAGES[*]}"
+    brew install "${BREW_PACKAGES[@]}"
   fi
 fi
 
@@ -93,8 +118,13 @@ rm -rf "$APP_DIR"
 cp -R "$SOURCE_DIR" "$APP_DIR"
 cd "$APP_DIR"
 
-log "Installing dependencies"
-npm install
+if [[ -f package-lock.json ]]; then
+  log "Installing dependencies with npm ci"
+  npm ci
+else
+  log "Installing dependencies"
+  npm install
+fi
 
 log "Building project"
 npm run build
@@ -107,8 +137,8 @@ if [[ ! -d "$TARGET_NODE_MODULES" || ! -w "$TARGET_NODE_MODULES" ]]; then
   log "Using user npm prefix at $HOME/.local"
 fi
 
-log "Running npm link"
-npm link
+log "Installing gitvideo command"
+npm install -g "$APP_DIR"
 
 printf '%s\n' "$REPO_SLUG" > "$INSTALL_ROOT/repo"
 printf '%s\n' "$TAG" > "$INSTALL_ROOT/version"

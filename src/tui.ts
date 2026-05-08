@@ -73,6 +73,7 @@ const ansi = {
   green: '\x1b[32m',
   inverse: '\x1b[7m',
   magenta: '\x1b[35m',
+  white: '\x1b[37m',
   yellow: '\x1b[33m',
 };
 const ansiStylePattern = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
@@ -115,11 +116,63 @@ function color(value: string, code: string): string {
   return `${code}${value}${ansi.reset}`;
 }
 
+function paintFit(value: string, width: number, code: string): string {
+  return color(fit(value, width), code);
+}
+
+function padVisible(value: string, width: number): string {
+  const visible = visibleLength(value);
+  if (visible > width) {
+    return fit(value, width);
+  }
+  return `${value}${' '.repeat(width - visible)}`;
+}
+
 function framedLine(content: string, width: number): string {
   const innerWidth = Math.max(0, width - 4);
-  const visible = visibleLength(content);
-  const padded = visible < innerWidth ? `${content}${' '.repeat(innerWidth - visible)}` : content;
-  return `${ansi.dim}│${ansi.reset} ${padded} ${ansi.dim}│${ansi.reset}`;
+  return `${ansi.dim}│${ansi.reset} ${padVisible(content, innerWidth)} ${ansi.dim}│${ansi.reset}`;
+}
+
+function divider(width: number): string {
+  return color(`├${'─'.repeat(width - 2)}┤`, ansi.dim);
+}
+
+function sectionTitle(label: string, width: number): string {
+  const innerWidth = Math.max(0, width - 4);
+  return framedLine(paintFit(label.toUpperCase(), innerWidth, ansi.yellow), width);
+}
+
+function statusText(item: MenuItem): string {
+  if (item.id === 'quick') {
+    return 'ready';
+  }
+  if (item.id === 'login' || item.id === 'status') {
+    return 'github';
+  }
+  if (item.id === 'exit') {
+    return 'close';
+  }
+  return 'setup';
+}
+
+function renderMenuRow(item: MenuItem, selected: boolean, innerWidth: number): string {
+  const marker = selected ? color('▶', ansi.green) : color(' ', ansi.dim);
+  const hotkey = selected ? color(`[${item.hotkey}]`, ansi.inverse) : color(`[${item.hotkey}]`, ansi.cyan);
+  const status = selected ? color(statusText(item), ansi.green) : color(statusText(item), ansi.dim);
+  const fixedWidth = visibleLength(`${marker} ${hotkey}  `) + visibleLength(`  ${status}`);
+  const labelWidth = Math.max(8, innerWidth - fixedWidth);
+  return `${marker} ${hotkey}  ${paintFit(item.label, labelWidth, selected ? ansi.white : ansi.reset)}  ${status}`;
+}
+
+function renderProgressRail(width: number): string {
+  const innerWidth = Math.max(0, width - 4);
+  const label = 'repo → graph → frames → mp4';
+  if (innerWidth < label.length + 4) {
+    return framedLine(paintFit(label, innerWidth, ansi.dim), width);
+  }
+  const railWidth = Math.max(0, innerWidth - label.length - 2);
+  const rail = `${color('●', ansi.green)}${color('─'.repeat(Math.max(0, railWidth - 2)), ansi.dim)}${color('●', ansi.magenta)}`;
+  return framedLine(`${label} ${rail}`, width);
 }
 
 export interface RenderAppFrameOptions {
@@ -138,27 +191,31 @@ export function renderAppFrame(options: RenderAppFrameOptions): string {
   const lines: string[] = [ansi.clear];
 
   lines.push(color(`┌${'─'.repeat(width - 2)}┐`, ansi.dim));
-  lines.push(framedLine(`${color('gitvideo', ansi.cyan)} ${color('interactive console', ansi.magenta)}`, width));
-  lines.push(framedLine(color(fit('Use arrows to move, Enter to select, q to quit', innerWidth), ansi.dim), width));
-  lines.push(color(`├${'─'.repeat(width - 2)}┤`, ansi.dim));
+  lines.push(framedLine(`${color('gitvideo', ansi.cyan)} ${color('studio', ansi.magenta)} ${paintFit('commit history to motion', Math.max(0, innerWidth - 16), ansi.dim)}`, width));
+  lines.push(renderProgressRail(width));
+  lines.push(divider(width));
 
   if (compact) {
-    lines.push(framedLine(`${options.selectedIndex + 1}/${mainMenuItems.length} ${color(fit(selected.label, innerWidth - 5), ansi.inverse)}`, width));
-    lines.push(framedLine(color(fit(selected.description, innerWidth), ansi.dim), width));
-  } else {
-    const maxMenuRows = Math.max(1, height - 8);
-    for (const [index, item] of mainMenuItems.slice(0, maxMenuRows).entries()) {
-      const marker = index === options.selectedIndex ? color('›', ansi.green) : ' ';
-      const label = index === options.selectedIndex
-        ? color(fit(`${item.hotkey}  ${item.label}`, innerWidth - 2), ansi.inverse)
-        : fit(`${item.hotkey}  ${item.label}`, innerWidth - 2);
-      lines.push(framedLine(`${marker} ${label}`, width));
+    lines.push(framedLine(`${color(`${options.selectedIndex + 1}/${mainMenuItems.length}`, ansi.green)} ${paintFit(selected.label, innerWidth - 5, ansi.inverse)}`, width));
+    if (height >= 8) {
+      lines.push(framedLine(paintFit(selected.description, innerWidth, ansi.dim), width));
     }
-    lines.push(framedLine(color(fit(selected.description, innerWidth), ansi.dim), width));
+    lines.push(framedLine(paintFit('↑/↓ move  Enter run  q quit', innerWidth, ansi.dim), width));
+  } else {
+    lines.push(sectionTitle('Actions', width));
+    const maxMenuRows = Math.max(1, Math.min(mainMenuItems.length, height - 12));
+    for (const [index, item] of mainMenuItems.slice(0, maxMenuRows).entries()) {
+      lines.push(framedLine(renderMenuRow(item, index === options.selectedIndex, innerWidth), width));
+    }
+    lines.push(divider(width));
+    lines.push(sectionTitle('Selected', width));
+    lines.push(framedLine(`${paintFit(selected.label, Math.max(0, innerWidth - 11), ansi.white)} ${paintFit(statusText(selected), 9, ansi.green)}`, width));
+    lines.push(framedLine(paintFit(selected.description, innerWidth, ansi.dim), width));
+    lines.push(framedLine(paintFit('↑/↓ move  Enter run  1-5/q shortcut  Esc quit', innerWidth, ansi.dim), width));
   }
 
   if (options.status) {
-    lines.push(framedLine(color(fit(options.status, innerWidth), ansi.yellow), width));
+    lines.push(framedLine(paintFit(options.status, innerWidth, ansi.yellow), width));
   }
 
   while (lines.length < height - 1) {

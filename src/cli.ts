@@ -139,7 +139,7 @@ export function buildCLI(dependencies: CliDependencies = {}): Command {
   program
     .name('gitvideo')
     .description('Turn Git commit history into an animated video')
-    .version('1.0.16')
+    .version('1.0.17')
     .addHelpText('after', '\nRun without arguments to open the interactive arrow-key TUI.\n')
     .action(async () => {
       await runTui();
